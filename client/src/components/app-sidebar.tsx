@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -38,6 +38,11 @@ const menuItems = [
     title: "Monitoring",
     url: "/monitoring",
     icon: BarChart3,
+  },
+  {
+    title: "Billing",
+    url: "/billing",
+    icon: Receipt,
   },
 ];
 

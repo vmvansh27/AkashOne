@@ -12,6 +12,7 @@ import VirtualMachines from "@/pages/virtual-machines";
 import Networks from "@/pages/networks";
 import Storage from "@/pages/storage";
 import Monitoring from "@/pages/monitoring";
+import Billing from "@/pages/billing";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/networks" component={Networks} />
       <Route path="/storage" component={Storage} />
       <Route path="/monitoring" component={Monitoring} />
+      <Route path="/billing" component={Billing} />
       <Route component={NotFound} />
     </Switch>
   );
