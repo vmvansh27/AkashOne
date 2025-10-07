@@ -16,6 +16,10 @@ import Billing from "@/pages/billing";
 import Resellers from "@/pages/resellers";
 import WhiteLabel from "@/pages/whitelabel";
 import ResellerCustomers from "@/pages/reseller-customers";
+import SuperAdmin from "@/pages/super-admin";
+import AdminRights from "@/pages/admin-rights";
+import AllVMs from "@/pages/all-vms";
+import AllKubernetes from "@/pages/all-kubernetes";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,6 +34,10 @@ function Router() {
       <Route path="/resellers" component={Resellers} />
       <Route path="/whitelabel" component={WhiteLabel} />
       <Route path="/customers" component={ResellerCustomers} />
+      <Route path="/super-admin" component={SuperAdmin} />
+      <Route path="/admin-rights" component={AdminRights} />
+      <Route path="/all-vms" component={AllVMs} />
+      <Route path="/all-kubernetes" component={AllKubernetes} />
       <Route component={NotFound} />
     </Switch>
   );

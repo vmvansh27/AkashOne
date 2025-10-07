@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -82,6 +82,29 @@ const resellerItems = [
   },
 ];
 
+const superAdminItems = [
+  {
+    title: "Super Admin",
+    url: "/super-admin",
+    icon: Crown,
+  },
+  {
+    title: "Admin Rights",
+    url: "/admin-rights",
+    icon: UserCheck,
+  },
+  {
+    title: "All VMs",
+    url: "/all-vms",
+    icon: Server,
+  },
+  {
+    title: "All Kubernetes",
+    url: "/all-kubernetes",
+    icon: Boxes,
+  },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
 
@@ -104,6 +127,23 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={location === item.url}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-')}`}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Super Admin</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {superAdminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
                     <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-')}`}>
