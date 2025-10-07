@@ -48,11 +48,6 @@ const menuItems = [
 
 const adminItems = [
   {
-    title: "Users",
-    url: "/users",
-    icon: Users,
-  },
-  {
     title: "Security",
     url: "/security",
     icon: Shield,

@@ -20,9 +20,29 @@ import SuperAdmin from "@/pages/super-admin";
 import AdminRights from "@/pages/admin-rights";
 import AllVMs from "@/pages/all-vms";
 import AllKubernetes from "@/pages/all-kubernetes";
+import SecuritySettings from "@/pages/security-settings";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
+import { useQuery } from "@tanstack/react-query";
 
 function Router() {
+  const { data: user, isLoading } = useQuery({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -38,6 +58,7 @@ function Router() {
       <Route path="/admin-rights" component={AdminRights} />
       <Route path="/all-vms" component={AllVMs} />
       <Route path="/all-kubernetes" component={AllKubernetes} />
+      <Route path="/security" component={SecuritySettings} />
       <Route component={NotFound} />
     </Switch>
   );
