@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -64,6 +64,24 @@ const adminItems = [
   },
 ];
 
+const resellerItems = [
+  {
+    title: "Resellers",
+    url: "/resellers",
+    icon: Store,
+  },
+  {
+    title: "White-Label",
+    url: "/whitelabel",
+    icon: Palette,
+  },
+  {
+    title: "My Customers",
+    url: "/customers",
+    icon: UserCog,
+  },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
 
@@ -89,6 +107,23 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
                     <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-')}`}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Reseller Portal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {resellerItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={location === item.url}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-').replace('-', '')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>

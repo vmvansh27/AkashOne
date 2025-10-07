@@ -13,6 +13,9 @@ import Networks from "@/pages/networks";
 import Storage from "@/pages/storage";
 import Monitoring from "@/pages/monitoring";
 import Billing from "@/pages/billing";
+import Resellers from "@/pages/resellers";
+import WhiteLabel from "@/pages/whitelabel";
+import ResellerCustomers from "@/pages/reseller-customers";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +27,9 @@ function Router() {
       <Route path="/storage" component={Storage} />
       <Route path="/monitoring" component={Monitoring} />
       <Route path="/billing" component={Billing} />
+      <Route path="/resellers" component={Resellers} />
+      <Route path="/whitelabel" component={WhiteLabel} />
+      <Route path="/customers" component={ResellerCustomers} />
       <Route component={NotFound} />
     </Switch>
   );
