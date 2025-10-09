@@ -70,6 +70,43 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 - Session-based authentication
 - Security settings page for 2FA management
 
+#### Identity and Access Management (IAM) System ✅
+- **Comprehensive RBAC (Role-Based Access Control):**
+  - System roles: Admin, Editor, Viewer (predefined, cannot be deleted)
+  - Custom roles: Create organization-specific roles with custom permissions
+  - Granular permissions organized by category (Compute, Networking, Storage, Billing, IAM)
+  - Permission categories: VM operations, Kubernetes, Database, DNS, Object Storage, Billing, Team Management
+- **Team Member Management:**
+  - Invite team members to organization via email
+  - Team member status tracking (invited, active, inactive)
+  - Assign multiple roles to team members
+  - Remove team members and revoke access
+  - View all team members with their assigned roles
+- **Role Management UI:**
+  - View all system and custom roles
+  - Create custom roles with descriptive names
+  - Edit custom role details (system roles are read-only)
+  - Delete custom roles (with protection for system roles)
+  - Manage role permissions via checkbox interface
+  - Permission organization by category for easy management
+- **Automatic Role Assignment:**
+  - New users automatically assigned Admin role on registration
+  - Enables immediate full access for organization owners
+- **API Security:**
+  - Permission checks on all IAM routes (team.manage, team.view, iam.manage, iam.view)
+  - Organization isolation - users can only see/manage their organization's data
+  - System role protection - prevents modification/deletion of built-in roles
+- **Default Permissions:**
+  - VM: view, create, update, delete
+  - Kubernetes: view, create, delete
+  - Database: view, create, delete
+  - Network: view, create
+  - DNS: view, manage
+  - Storage: view, manage
+  - Billing: view, manage
+  - IAM: view, manage
+  - Team: view, manage
+
 ## Project Architecture
 
 ### Frontend (React + TypeScript + Vite)
@@ -117,12 +154,17 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
   - `requireFeature(key)` - Feature flag validation for API routes
 
 ### Database Schema
-- **users:** User accounts with 2FA fields
+- **users:** User accounts with 2FA fields, organizationId, and accountType
 - **virtual_machines:** VM cache with CloudStack IDs and metadata
 - **vm_snapshots:** VM snapshot records with CloudStack snapshot IDs, names, descriptions, and state tracking
 - **kubernetes_clusters:** K8s cluster configurations and metrics
 - **databases:** Database instance configurations and monitoring
 - **feature_flags:** Feature toggle system with key, name, description, category, enabled status, icon, and sort order
+- **roles:** System and custom roles with organization isolation
+- **permissions:** Granular permissions organized by category (Compute, Networking, Storage, Billing, IAM)
+- **role_permissions:** Many-to-many relationship between roles and permissions
+- **user_roles:** Many-to-many relationship between users and roles with grant tracking
+- **team_members:** Team member invitations and status with organization isolation
 
 ## User Preferences
 
@@ -210,6 +252,24 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 - `POST /api/databases` - Create new database
 - `PATCH /api/databases/:id` - Update database
 - `DELETE /api/databases/:id` - Delete database
+
+### IAM (Identity and Access Management)
+- `GET /api/iam/roles` - List all roles (filtered by organization)
+- `POST /api/iam/roles` - Create custom role
+- `PATCH /api/iam/roles/:id` - Update role
+- `DELETE /api/iam/roles/:id` - Delete role
+- `GET /api/iam/permissions` - List all permissions
+- `GET /api/iam/roles/:roleId/permissions` - Get role permissions
+- `POST /api/iam/roles/:roleId/permissions` - Assign permission to role
+- `DELETE /api/iam/roles/:roleId/permissions/:permissionId` - Remove permission from role
+- `GET /api/iam/team-members` - List organization team members
+- `POST /api/iam/team-members` - Invite team member
+- `PATCH /api/iam/team-members/:id` - Update team member
+- `DELETE /api/iam/team-members/:id` - Remove team member
+- `GET /api/iam/users/:userId/roles` - Get user roles
+- `POST /api/iam/users/:userId/roles` - Assign role to user
+- `DELETE /api/iam/users/:userId/roles/:roleId` - Remove role from user
+- `GET /api/iam/me/permissions` - Get current user permissions
 
 ## Deployment
 

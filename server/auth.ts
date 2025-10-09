@@ -31,6 +31,19 @@ export async function registerUser(username: string, email: string, password: st
     password: hashedPassword,
   });
 
+  // Assign Admin role ONLY to the FIRST user (bootstrap admin)
+  // Subsequent users must be invited via team member system
+  const allUsers = await storage.getUsers();
+  const isFirstUser = allUsers.length === 1; // Only this user exists
+  
+  if (isFirstUser) {
+    const roles = await storage.getRoles();
+    const adminRole = roles.find((r) => r.name === "Admin" && r.isSystem);
+    if (adminRole) {
+      await storage.assignRoleToUser(user.id, adminRole.id, user.id);
+    }
+  }
+
   return user;
 }
 

@@ -32,6 +32,7 @@ import { randomUUID } from "crypto";
 // you might need
 
 export interface IStorage {
+  getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -161,6 +162,10 @@ export class MemStorage implements IStorage {
     this.initializeDefaultFeatureFlags();
     this.initializeDefaultPermissions();
     this.initializeDefaultRoles();
+  }
+
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
   async getUser(id: string): Promise<User | undefined> {
