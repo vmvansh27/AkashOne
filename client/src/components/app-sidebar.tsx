@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, ShoppingBag } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, ShoppingBag, Cloud, Globe } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -38,6 +38,16 @@ const menuItems = [
     title: "Marketplace",
     url: "/marketplace",
     icon: ShoppingBag,
+  },
+  {
+    title: "Object Storage",
+    url: "/object-storage",
+    icon: Cloud,
+  },
+  {
+    title: "DNS",
+    url: "/dns",
+    icon: Globe,
   },
   {
     title: "Networks",

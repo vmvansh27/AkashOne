@@ -24,6 +24,8 @@ import SecuritySettings from "@/pages/security-settings";
 import Kubernetes from "@/pages/kubernetes";
 import Database from "@/pages/database";
 import Marketplace from "@/pages/marketplace";
+import ObjectStorage from "@/pages/object-storage";
+import DNS from "@/pages/dns";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { useQuery } from "@tanstack/react-query";
@@ -53,6 +55,8 @@ function Router() {
       <Route path="/kubernetes" component={Kubernetes} />
       <Route path="/database" component={Database} />
       <Route path="/marketplace" component={Marketplace} />
+      <Route path="/object-storage" component={ObjectStorage} />
+      <Route path="/dns" component={DNS} />
       <Route path="/networks" component={Networks} />
       <Route path="/storage" component={Storage} />
       <Route path="/monitoring" component={Monitoring} />
