@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, Lock, Mail, User } from "lucide-react";
+import { Shield, Lock, Mail, User, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -17,6 +17,7 @@ export default function Login() {
     username: "",
     email: "",
     password: "",
+    gstNumber: "",
     twoFactorCode: "",
   });
   const [sessionToken, setSessionToken] = useState("");
@@ -48,6 +49,7 @@ export default function Login() {
           username: formData.username,
           email: formData.email,
           password: formData.password,
+          gstNumber: formData.gstNumber.toUpperCase(),
         });
 
         toast({
@@ -55,7 +57,7 @@ export default function Login() {
           description: "Please log in to continue",
         });
         setIsLogin(true);
-        setFormData({ ...formData, password: "" });
+        setFormData({ ...formData, password: "", gstNumber: "" });
       }
     } catch (error: any) {
       toast({
@@ -183,22 +185,45 @@ export default function Login() {
             </div>
 
             {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    className="pl-9"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                    data-testid="input-email"
-                  />
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      className="pl-9"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      data-testid="input-email"
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gstNumber">GST Number (GSTIN)</Label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="gstNumber"
+                      type="text"
+                      placeholder="29ABCDE1234F1Z5"
+                      className="pl-9 font-mono uppercase"
+                      value={formData.gstNumber}
+                      onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value.toUpperCase() })}
+                      maxLength={15}
+                      required
+                      data-testid="input-gst-number"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    15 characters: 2 digits (state) + 10 alphanumeric (PAN) + Z + 1 digit
+                  </p>
+                </div>
+              </>
             )}
 
             <div className="space-y-2">
@@ -227,7 +252,7 @@ export default function Login() {
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin);
-                  setFormData({ username: "", email: "", password: "", twoFactorCode: "" });
+                  setFormData({ username: "", email: "", password: "", gstNumber: "", twoFactorCode: "" });
                 }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-toggle-mode"
