@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp, Users, Tag } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp, Users, Tag, Percent } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -84,6 +84,12 @@ const billingItems: MenuItem[] = [
     title: "Discount Coupons",
     url: "/billing/coupons",
     icon: Tag,
+    featureKey: "billing",
+  },
+  {
+    title: "User Discounts",
+    url: "/billing/user-discounts",
+    icon: Percent,
     featureKey: "billing",
   },
   {

@@ -37,6 +37,7 @@ import ObjectStorage from "@/pages/object-storage";
 import DNS from "@/pages/dns";
 import TeamManagement from "@/pages/team-management";
 import RoleManagement from "@/pages/role-management";
+import UserDiscounts from "@/pages/user-discounts";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { useQuery } from "@tanstack/react-query";
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/monitoring" component={Monitoring} />
       <Route path="/billing" component={Billing} />
       <Route path="/billing/coupons" component={DiscountCoupons} />
+      <Route path="/billing/user-discounts" component={UserDiscounts} />
       <Route path="/resellers" component={Resellers} />
       <Route path="/whitelabel" component={WhiteLabel} />
       <Route path="/customers" component={ResellerCustomers} />
