@@ -9,7 +9,6 @@ import {
   Play,
   Square,
   Trash2,
-  RefreshCw,
   Terminal,
   Activity,
   Server,
@@ -47,82 +46,9 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-
-interface K8sCluster {
-  id: string;
-  name: string;
-  version: string;
-  status: "running" | "stopped" | "creating" | "error" | "updating";
-  nodes: {
-    master: number;
-    worker: number;
-  };
-  cpu: {
-    used: number;
-    total: number;
-  };
-  memory: {
-    used: number;
-    total: number;
-  };
-  pods: {
-    running: number;
-    total: number;
-  };
-  health: "healthy" | "warning" | "critical";
-  created: string;
-  region: string;
-  autoHealing: boolean;
-  autoScaling: boolean;
-}
-
-const mockClusters: K8sCluster[] = [
-  {
-    id: "k8s-prod-001",
-    name: "production-cluster",
-    version: "v1.28.3",
-    status: "running",
-    nodes: { master: 3, worker: 5 },
-    cpu: { used: 45, total: 64 },
-    memory: { used: 128, total: 256 },
-    pods: { running: 127, total: 250 },
-    health: "healthy",
-    created: "2024-09-15",
-    region: "us-east-1",
-    autoHealing: true,
-    autoScaling: true,
-  },
-  {
-    id: "k8s-dev-002",
-    name: "development-cluster",
-    version: "v1.28.3",
-    status: "running",
-    nodes: { master: 1, worker: 3 },
-    cpu: { used: 12, total: 32 },
-    memory: { used: 48, total: 128 },
-    pods: { running: 45, total: 110 },
-    health: "healthy",
-    created: "2024-10-01",
-    region: "us-west-2",
-    autoHealing: true,
-    autoScaling: false,
-  },
-  {
-    id: "k8s-staging-003",
-    name: "staging-cluster",
-    version: "v1.27.8",
-    status: "running",
-    nodes: { master: 1, worker: 2 },
-    cpu: { used: 8, total: 16 },
-    memory: { used: 24, total: 64 },
-    pods: { running: 32, total: 80 },
-    health: "warning",
-    created: "2024-09-28",
-    region: "eu-central-1",
-    autoHealing: false,
-    autoScaling: false,
-  },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { KubernetesCluster } from "@shared/schema";
 
 export default function Kubernetes() {
   const { toast } = useToast();
@@ -139,11 +65,86 @@ export default function Kubernetes() {
     autoScaling: true,
   });
 
-  const filteredClusters = mockClusters.filter((cluster) =>
+  const { data: clusters = [], isLoading } = useQuery<KubernetesCluster[]>({
+    queryKey: ["/api/kubernetes/clusters"],
+  });
+
+  const createClusterMutation = useMutation({
+    mutationFn: async (data: typeof newCluster) => {
+      return await apiRequest("POST", "/api/kubernetes/clusters", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/kubernetes/clusters"] });
+      toast({
+        title: "Cluster Created",
+        description: `Kubernetes cluster "${newCluster.name}" has been created successfully.`,
+      });
+      setCreateDialogOpen(false);
+      setNewCluster({
+        name: "",
+        version: "v1.28.3",
+        region: "us-east-1",
+        masterNodes: "3",
+        workerNodes: "3",
+        instanceType: "m5.large",
+        autoHealing: true,
+        autoScaling: true,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create cluster",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateClusterMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<KubernetesCluster> }) => {
+      return await apiRequest("PATCH", `/api/kubernetes/clusters/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/kubernetes/clusters"] });
+      toast({
+        title: "Cluster Updated",
+        description: "Cluster has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update cluster",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteClusterMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/kubernetes/clusters/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/kubernetes/clusters"] });
+      toast({
+        title: "Cluster Deleted",
+        description: "Cluster has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete cluster",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredClusters = clusters.filter((cluster) =>
     cluster.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusColor = (status: K8sCluster["status"]) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "running":
         return "default";
@@ -160,7 +161,7 @@ export default function Kubernetes() {
     }
   };
 
-  const getHealthColor = (health: K8sCluster["health"]) => {
+  const getHealthColor = (health: string) => {
     switch (health) {
       case "healthy":
         return "text-green-500";
@@ -174,29 +175,33 @@ export default function Kubernetes() {
   };
 
   const handleCreateCluster = () => {
-    toast({
-      title: "Cluster Creation Started",
-      description: `Creating Kubernetes cluster "${newCluster.name}"...`,
-    });
-    setCreateDialogOpen(false);
-    setNewCluster({
-      name: "",
-      version: "v1.28.3",
-      region: "us-east-1",
-      masterNodes: "3",
-      workerNodes: "3",
-      instanceType: "m5.large",
-      autoHealing: true,
-      autoScaling: true,
-    });
+    createClusterMutation.mutate(newCluster);
   };
 
-  const handleAction = (action: string, cluster: K8sCluster) => {
-    toast({
-      title: `${action} Cluster`,
-      description: `${action} cluster "${cluster.name}"...`,
-    });
+  const handleAction = (action: string, cluster: KubernetesCluster) => {
+    if (action === "Start") {
+      updateClusterMutation.mutate({ id: cluster.id, data: { status: "running" } });
+    } else if (action === "Stop") {
+      updateClusterMutation.mutate({ id: cluster.id, data: { status: "stopped" } });
+    } else if (action === "Delete") {
+      if (confirm(`Are you sure you want to delete "${cluster.name}"?`)) {
+        deleteClusterMutation.mutate(cluster.id);
+      }
+    } else {
+      toast({
+        title: action,
+        description: `${action} action for "${cluster.name}" initiated.`,
+      });
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -363,10 +368,10 @@ export default function Kubernetes() {
               </Button>
               <Button
                 onClick={handleCreateCluster}
-                disabled={!newCluster.name}
+                disabled={!newCluster.name || createClusterMutation.isPending}
                 data-testid="button-confirm-create"
               >
-                Create Cluster
+                {createClusterMutation.isPending ? "Creating..." : "Create Cluster"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -381,10 +386,10 @@ export default function Kubernetes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-clusters">
-              {mockClusters.length}
+              {clusters.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              {mockClusters.filter((c) => c.status === "running").length} running
+              {clusters.filter((c) => c.status === "running").length} running
             </p>
           </CardContent>
         </Card>
@@ -395,7 +400,7 @@ export default function Kubernetes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-nodes">
-              {mockClusters.reduce((sum, c) => sum + c.nodes.master + c.nodes.worker, 0)}
+              {clusters.reduce((sum, c) => sum + c.masterNodes + c.workerNodes, 0)}
             </div>
             <p className="text-xs text-muted-foreground">Across all clusters</p>
           </CardContent>
@@ -407,7 +412,7 @@ export default function Kubernetes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-running-pods">
-              {mockClusters.reduce((sum, c) => sum + c.pods.running, 0)}
+              {clusters.reduce((sum, c) => sum + c.podsRunning, 0)}
             </div>
             <p className="text-xs text-muted-foreground">Active workloads</p>
           </CardContent>
@@ -469,10 +474,7 @@ export default function Kubernetes() {
                       {cluster.health === "healthy" && (
                         <CheckCircle2 className={`h-4 w-4 ${getHealthColor(cluster.health)}`} />
                       )}
-                      {cluster.health === "warning" && (
-                        <AlertTriangle className={`h-4 w-4 ${getHealthColor(cluster.health)}`} />
-                      )}
-                      {cluster.health === "critical" && (
+                      {cluster.health !== "healthy" && (
                         <AlertTriangle className={`h-4 w-4 ${getHealthColor(cluster.health)}`} />
                       )}
                       <span className="text-sm capitalize">{cluster.health}</span>
@@ -481,10 +483,10 @@ export default function Kubernetes() {
                   <TableCell>
                     <div className="text-sm">
                       <p>
-                        <span className="font-medium">{cluster.nodes.master}</span> master
+                        <span className="font-medium">{cluster.masterNodes}</span> master
                       </p>
                       <p>
-                        <span className="font-medium">{cluster.nodes.worker}</span> worker
+                        <span className="font-medium">{cluster.workerNodes}</span> worker
                       </p>
                     </div>
                   </TableCell>
@@ -494,26 +496,26 @@ export default function Kubernetes() {
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span>CPU</span>
                           <span className="text-muted-foreground">
-                            {cluster.cpu.used}/{cluster.cpu.total} cores
+                            {cluster.cpuUsed}/{cluster.cpuTotal} cores
                           </span>
                         </div>
-                        <Progress value={(cluster.cpu.used / cluster.cpu.total) * 100} />
+                        <Progress value={(cluster.cpuUsed / cluster.cpuTotal) * 100} />
                       </div>
                       <div>
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span>Memory</span>
                           <span className="text-muted-foreground">
-                            {cluster.memory.used}/{cluster.memory.total} GB
+                            {cluster.memoryUsed}/{cluster.memoryTotal} GB
                           </span>
                         </div>
-                        <Progress value={(cluster.memory.used / cluster.memory.total) * 100} />
+                        <Progress value={(cluster.memoryUsed / cluster.memoryTotal) * 100} />
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <span className="font-medium">{cluster.pods.running}</span>
-                      <span className="text-muted-foreground">/{cluster.pods.total}</span>
+                      <span className="font-medium">{cluster.podsRunning}</span>
+                      <span className="text-muted-foreground">/{cluster.podsTotal}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -571,6 +573,7 @@ export default function Kubernetes() {
                         variant="outline"
                         size="icon"
                         onClick={() => handleAction("Delete", cluster)}
+                        disabled={deleteClusterMutation.isPending}
                         data-testid={`button-delete-${cluster.id}`}
                       >
                         <Trash2 className="h-4 w-4" />

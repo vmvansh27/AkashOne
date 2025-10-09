@@ -45,117 +45,112 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface DatabaseInstance {
-  id: string;
-  name: string;
-  engine: "mysql" | "postgresql" | "mongodb" | "redis";
-  version: string;
-  status: "running" | "stopped" | "creating" | "error" | "backup";
-  storage: number;
-  cpu: number;
-  memory: number;
-  connections: {
-    current: number;
-    max: number;
-  };
-  endpoint: string;
-  port: number;
-  backupEnabled: boolean;
-  created: string;
-  region: string;
-}
-
-const mockDatabases: DatabaseInstance[] = [
-  {
-    id: "db-mysql-001",
-    name: "production-mysql",
-    engine: "mysql",
-    version: "8.0.35",
-    status: "running",
-    storage: 100,
-    cpu: 4,
-    memory: 16,
-    connections: { current: 45, max: 200 },
-    endpoint: "prod-mysql.akashone.com",
-    port: 3306,
-    backupEnabled: true,
-    created: "2024-09-10",
-    region: "us-east-1",
-  },
-  {
-    id: "db-postgres-002",
-    name: "analytics-postgres",
-    engine: "postgresql",
-    version: "15.4",
-    status: "running",
-    storage: 200,
-    cpu: 8,
-    memory: 32,
-    connections: { current: 28, max: 500 },
-    endpoint: "analytics-pg.akashone.com",
-    port: 5432,
-    backupEnabled: true,
-    created: "2024-09-15",
-    region: "us-west-2",
-  },
-  {
-    id: "db-mongo-003",
-    name: "app-mongodb",
-    engine: "mongodb",
-    version: "7.0.2",
-    status: "running",
-    storage: 50,
-    cpu: 2,
-    memory: 8,
-    connections: { current: 12, max: 100 },
-    endpoint: "app-mongo.akashone.com",
-    port: 27017,
-    backupEnabled: false,
-    created: "2024-10-01",
-    region: "ap-south-1",
-  },
-  {
-    id: "db-redis-004",
-    name: "cache-redis",
-    engine: "redis",
-    version: "7.2.3",
-    status: "running",
-    storage: 10,
-    cpu: 2,
-    memory: 4,
-    connections: { current: 150, max: 1000 },
-    endpoint: "cache-redis.akashone.com",
-    port: 6379,
-    backupEnabled: true,
-    created: "2024-09-20",
-    region: "us-east-1",
-  },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Database as DatabaseType } from "@shared/schema";
 
 export default function Database() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedEngine, setSelectedEngine] = useState<"all" | DatabaseInstance["engine"]>("all");
+  const [selectedEngine, setSelectedEngine] = useState<"all" | DatabaseType["engine"]>("all");
   const [newDatabase, setNewDatabase] = useState({
     name: "",
-    engine: "mysql" as DatabaseInstance["engine"],
+    engine: "mysql" as DatabaseType["engine"],
     version: "8.0.35",
     region: "us-east-1",
     instanceType: "db.m5.large",
     storage: "100",
+    cpu: "2",
+    memory: "8",
     backupEnabled: true,
     multiAZ: false,
   });
 
-  const filteredDatabases = mockDatabases.filter((db) => {
+  const { data: databases = [], isLoading } = useQuery<DatabaseType[]>({
+    queryKey: ["/api/databases"],
+  });
+
+  const createDatabaseMutation = useMutation({
+    mutationFn: async (data: typeof newDatabase) => {
+      return await apiRequest("POST", "/api/databases", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/databases"] });
+      toast({
+        title: "Database Created",
+        description: `Database "${newDatabase.name}" has been created successfully.`,
+      });
+      setCreateDialogOpen(false);
+      setNewDatabase({
+        name: "",
+        engine: "mysql",
+        version: "8.0.35",
+        region: "us-east-1",
+        instanceType: "db.m5.large",
+        storage: "100",
+        cpu: "2",
+        memory: "8",
+        backupEnabled: true,
+        multiAZ: false,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create database",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateDatabaseMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<DatabaseType> }) => {
+      return await apiRequest("PATCH", `/api/databases/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/databases"] });
+      toast({
+        title: "Database Updated",
+        description: "Database has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update database",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteDatabaseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/databases/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/databases"] });
+      toast({
+        title: "Database Deleted",
+        description: "Database has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete database",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredDatabases = databases.filter((db) => {
     const matchesSearch = db.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesEngine = selectedEngine === "all" || db.engine === selectedEngine;
     return matchesSearch && matchesEngine;
   });
 
-  const getEngineVersions = (engine: DatabaseInstance["engine"]) => {
+  const getEngineVersions = (engine: DatabaseType["engine"]) => {
     switch (engine) {
       case "mysql":
         return ["8.0.35", "8.0.34", "5.7.44"];
@@ -170,11 +165,7 @@ export default function Database() {
     }
   };
 
-  const getEngineIcon = (engine: DatabaseInstance["engine"]) => {
-    return DatabaseIcon;
-  };
-
-  const getStatusColor = (status: DatabaseInstance["status"]) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "running":
         return "default";
@@ -191,38 +182,63 @@ export default function Database() {
     }
   };
 
-  const handleCreateDatabase = () => {
-    toast({
-      title: "Database Creation Started",
-      description: `Creating ${newDatabase.engine} database "${newDatabase.name}"...`,
-    });
-    setCreateDialogOpen(false);
-    setNewDatabase({
-      name: "",
-      engine: "mysql",
-      version: "8.0.35",
-      region: "us-east-1",
-      instanceType: "db.m5.large",
-      storage: "100",
-      backupEnabled: true,
-      multiAZ: false,
-    });
+  const getEngineColor = (engine: string) => {
+    switch (engine) {
+      case "mysql":
+        return "bg-blue-500";
+      case "postgresql":
+        return "bg-indigo-500";
+      case "mongodb":
+        return "bg-green-500";
+      case "redis":
+        return "bg-red-500";
+      default:
+        return "bg-muted";
+    }
   };
 
-  const handleAction = (action: string, database: DatabaseInstance) => {
-    toast({
-      title: `${action} Database`,
-      description: `${action} database "${database.name}"...`,
-    });
+  const handleCreateDatabase = () => {
+    createDatabaseMutation.mutate(newDatabase);
   };
+
+  const handleAction = (action: string, database: DatabaseType) => {
+    if (action === "Start") {
+      updateDatabaseMutation.mutate({ id: database.id, data: { status: "running" } });
+    } else if (action === "Stop") {
+      updateDatabaseMutation.mutate({ id: database.id, data: { status: "stopped" } });
+    } else if (action === "Delete") {
+      if (confirm(`Are you sure you want to delete "${database.name}"? This action cannot be undone.`)) {
+        deleteDatabaseMutation.mutate(database.id);
+      }
+    } else if (action === "Backup") {
+      updateDatabaseMutation.mutate({ id: database.id, data: { status: "backup" } });
+      toast({
+        title: "Backup Initiated",
+        description: `Creating backup for "${database.name}"`,
+      });
+    } else {
+      toast({
+        title: action,
+        description: `${action} action for "${database.name}" initiated.`,
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Database as a Service</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Database Services</h1>
           <p className="text-muted-foreground mt-1">
-            Managed database instances with automated backups and scaling
+            Manage your Database-as-a-Service instances
           </p>
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -236,7 +252,7 @@ export default function Database() {
             <DialogHeader>
               <DialogTitle>Create Database Instance</DialogTitle>
               <DialogDescription>
-                Deploy a managed database with one-click provisioning
+                Deploy a fully-managed database with automatic backups and scaling
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -255,12 +271,12 @@ export default function Database() {
                   <Label htmlFor="db-engine">Database Engine</Label>
                   <Select
                     value={newDatabase.engine}
-                    onValueChange={(value: DatabaseInstance["engine"]) => {
+                    onValueChange={(value: DatabaseType["engine"]) => {
                       const versions = getEngineVersions(value);
                       setNewDatabase({ ...newDatabase, engine: value, version: versions[0] });
                     }}
                   >
-                    <SelectTrigger id="db-engine" data-testid="select-engine">
+                    <SelectTrigger id="db-engine" data-testid="select-db-engine">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -277,7 +293,7 @@ export default function Database() {
                     value={newDatabase.version}
                     onValueChange={(value) => setNewDatabase({ ...newDatabase, version: value })}
                   >
-                    <SelectTrigger id="db-version" data-testid="select-version">
+                    <SelectTrigger id="db-version" data-testid="select-db-version">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -292,12 +308,12 @@ export default function Database() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="db-region">Region</Label>
+                  <Label htmlFor="region">Region</Label>
                   <Select
                     value={newDatabase.region}
                     onValueChange={(value) => setNewDatabase({ ...newDatabase, region: value })}
                   >
-                    <SelectTrigger id="db-region" data-testid="select-region">
+                    <SelectTrigger id="region" data-testid="select-region">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -309,35 +325,35 @@ export default function Database() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="db-storage">Storage (GB)</Label>
-                  <Input
-                    id="db-storage"
-                    type="number"
-                    min="20"
-                    max="1000"
-                    value={newDatabase.storage}
-                    onChange={(e) => setNewDatabase({ ...newDatabase, storage: e.target.value })}
-                    data-testid="input-storage"
-                  />
+                  <Label htmlFor="instance-type">Instance Type</Label>
+                  <Select
+                    value={newDatabase.instanceType}
+                    onValueChange={(value) => setNewDatabase({ ...newDatabase, instanceType: value })}
+                  >
+                    <SelectTrigger id="instance-type" data-testid="select-instance-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="db.t3.micro">db.t3.micro (1 vCPU, 1 GB RAM)</SelectItem>
+                      <SelectItem value="db.t3.small">db.t3.small (2 vCPU, 2 GB RAM)</SelectItem>
+                      <SelectItem value="db.m5.large">db.m5.large (2 vCPU, 8 GB RAM)</SelectItem>
+                      <SelectItem value="db.m5.xlarge">db.m5.xlarge (4 vCPU, 16 GB RAM)</SelectItem>
+                      <SelectItem value="db.m5.2xlarge">db.m5.2xlarge (8 vCPU, 32 GB RAM)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="db-instance-type">Instance Type</Label>
-                <Select
-                  value={newDatabase.instanceType}
-                  onValueChange={(value) => setNewDatabase({ ...newDatabase, instanceType: value })}
-                >
-                  <SelectTrigger id="db-instance-type" data-testid="select-instance-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="db.t3.micro">db.t3.micro (1 vCPU, 1 GB RAM)</SelectItem>
-                    <SelectItem value="db.t3.small">db.t3.small (1 vCPU, 2 GB RAM)</SelectItem>
-                    <SelectItem value="db.m5.large">db.m5.large (2 vCPU, 8 GB RAM)</SelectItem>
-                    <SelectItem value="db.m5.xlarge">db.m5.xlarge (4 vCPU, 16 GB RAM)</SelectItem>
-                    <SelectItem value="db.m5.2xlarge">db.m5.2xlarge (8 vCPU, 32 GB RAM)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="storage">Storage Size (GB)</Label>
+                <Input
+                  id="storage"
+                  type="number"
+                  min="20"
+                  max="16000"
+                  value={newDatabase.storage}
+                  onChange={(e) => setNewDatabase({ ...newDatabase, storage: e.target.value })}
+                  data-testid="input-storage-size"
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
@@ -362,7 +378,7 @@ export default function Database() {
                 <div>
                   <p className="font-medium">Multi-AZ Deployment</p>
                   <p className="text-sm text-muted-foreground">
-                    High availability across zones
+                    High availability across multiple zones
                   </p>
                 </div>
                 <Button
@@ -387,10 +403,10 @@ export default function Database() {
               </Button>
               <Button
                 onClick={handleCreateDatabase}
-                disabled={!newDatabase.name}
+                disabled={!newDatabase.name || createDatabaseMutation.isPending}
                 data-testid="button-confirm-create"
               >
-                Create Database
+                {createDatabaseMutation.isPending ? "Creating..." : "Create Database"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -405,10 +421,10 @@ export default function Database() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-databases">
-              {mockDatabases.length}
+              {databases.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              {mockDatabases.filter((db) => db.status === "running").length} running
+              {databases.filter((d) => d.status === "running").length} running
             </p>
           </CardContent>
         </Card>
@@ -419,33 +435,33 @@ export default function Database() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-storage">
-              {mockDatabases.reduce((sum, db) => sum + db.storage, 0)} GB
+              {databases.reduce((sum, d) => sum + d.storage, 0)} GB
             </div>
             <p className="text-xs text-muted-foreground">Across all instances</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Connections</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Connections</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-connections">
-              {mockDatabases.reduce((sum, db) => sum + db.connections.current, 0)}
+              {databases.reduce((sum, d) => sum + d.connectionsMax, 0)}
             </div>
-            <p className="text-xs text-muted-foreground">Active connections</p>
+            <p className="text-xs text-muted-foreground">Max connections</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Backups Enabled</CardTitle>
-            <RefreshCw className="h-4 w-4 text-muted-foreground" />
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-backups-enabled">
-              {mockDatabases.filter((db) => db.backupEnabled).length}
+              {databases.filter((d) => d.backupEnabled).length}
             </div>
-            <p className="text-xs text-muted-foreground">With automated backups</p>
+            <p className="text-xs text-muted-foreground">Active backup policies</p>
           </CardContent>
         </Card>
       </div>
@@ -453,10 +469,10 @@ export default function Database() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Database Instances</CardTitle>
-            <div className="flex items-center gap-2">
-              <Tabs value={selectedEngine} onValueChange={(value: any) => setSelectedEngine(value)}>
-                <TabsList>
+            <div className="flex items-center gap-4">
+              <CardTitle>Database Instances</CardTitle>
+              <Tabs value={selectedEngine} onValueChange={(v) => setSelectedEngine(v as any)}>
+                <TabsList data-testid="tabs-engine-filter">
                   <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
                   <TabsTrigger value="mysql" data-testid="tab-mysql">MySQL</TabsTrigger>
                   <TabsTrigger value="postgresql" data-testid="tab-postgresql">PostgreSQL</TabsTrigger>
@@ -464,6 +480,8 @@ export default function Database() {
                   <TabsTrigger value="redis" data-testid="tab-redis">Redis</TabsTrigger>
                 </TabsList>
               </Tabs>
+            </div>
+            <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -483,9 +501,9 @@ export default function Database() {
               <TableRow>
                 <TableHead>Database Name</TableHead>
                 <TableHead>Engine</TableHead>
-                <TableHead>Version</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Endpoint</TableHead>
+                <TableHead>Storage</TableHead>
                 <TableHead>Resources</TableHead>
                 <TableHead>Connections</TableHead>
                 <TableHead>Region</TableHead>
@@ -503,12 +521,12 @@ export default function Database() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <DatabaseIcon className="h-4 w-4" />
-                      <span className="capitalize">{database.engine}</span>
+                      <div className={`h-2 w-2 rounded-full ${getEngineColor(database.engine)}`} />
+                      <div>
+                        <p className="font-medium capitalize">{database.engine}</p>
+                        <p className="text-xs text-muted-foreground">{database.version}</p>
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <code className="text-xs">{database.version}</code>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusColor(database.status)} data-testid={`badge-status-${database.id}`}>
@@ -516,21 +534,31 @@ export default function Database() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="font-mono text-xs">
-                      <p>{database.endpoint}</p>
-                      <p className="text-muted-foreground">:{database.port}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm space-y-1">
-                      <p>{database.cpu} vCPU, {database.memory} GB RAM</p>
-                      <p className="text-muted-foreground">{database.storage} GB Storage</p>
+                    <div>
+                      <p className="text-sm font-mono">{database.endpoint}</p>
+                      <p className="text-xs text-muted-foreground">Port: {database.port}</p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <span className="font-medium">{database.connections.current}</span>
-                      <span className="text-muted-foreground">/{database.connections.max}</span>
+                      <p className="font-medium">{database.storage} GB</p>
+                      <p className="text-xs text-muted-foreground">
+                        {database.backupEnabled ? "Backup: Yes" : "Backup: No"}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <p>CPU: {database.cpu} cores</p>
+                      <p>RAM: {database.memory} GB</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <p className="font-medium">{database.connectionsCurrent}</p>
+                      <p className="text-xs text-muted-foreground">
+                        / {database.connectionsMax} max
+                      </p>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -554,7 +582,7 @@ export default function Database() {
                             onClick={() => handleAction("Backup", database)}
                             data-testid={`button-backup-${database.id}`}
                           >
-                            <Download className="h-4 w-4" />
+                            <RefreshCw className="h-4 w-4" />
                           </Button>
                         </>
                       )}
@@ -579,7 +607,16 @@ export default function Database() {
                       <Button
                         variant="outline"
                         size="icon"
+                        onClick={() => handleAction("Download", database)}
+                        data-testid={`button-download-${database.id}`}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
                         onClick={() => handleAction("Delete", database)}
+                        disabled={deleteDatabaseMutation.isPending}
                         data-testid={`button-delete-${database.id}`}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -597,7 +634,7 @@ export default function Database() {
               <p className="text-muted-foreground mb-4">
                 {searchTerm
                   ? "Try adjusting your search or filters"
-                  : "Get started by creating your first managed database"}
+                  : "Get started by creating your first database instance"}
               </p>
               {!searchTerm && (
                 <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-database">
