@@ -10,6 +10,7 @@ import {
   enableTwoFactor,
   disableTwoFactor,
 } from "./auth";
+import { createFeatureFlagMiddleware } from "./middleware/feature-flags";
 
 declare module "express-session" {
   interface SessionData {
@@ -31,6 +32,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       },
     })
   );
+
+  // Feature flag middleware factory
+  const requireFeature = createFeatureFlagMiddleware(storage);
+  
+  // Usage example for protecting routes with feature flags:
+  // app.get("/api/payment-gateways", requireAuth, requireFeature("payment_gateway"), async (req, res) => {
+  //   ... route handler
+  // });
 
   // Register endpoint
   app.post("/api/auth/register", async (req, res) => {
