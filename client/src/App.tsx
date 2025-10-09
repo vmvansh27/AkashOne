@@ -34,6 +34,7 @@ import Database from "@/pages/database";
 import Marketplace from "@/pages/marketplace";
 import ObjectStorage from "@/pages/object-storage";
 import DNS from "@/pages/dns";
+import TeamManagement from "@/pages/team-management";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { useQuery } from "@tanstack/react-query";
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/ssl-certificates" component={SSLCertificates} />
       <Route path="/cdn" component={CDN} />
       <Route path="/auto-scaling" component={AutoScaling} />
+      <Route path="/team-management" component={TeamManagement} />
       <Route component={NotFound} />
     </Switch>
   );

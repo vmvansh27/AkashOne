@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -133,6 +133,11 @@ const networkingItems: MenuItem[] = [
 ];
 
 const adminItems: MenuItem[] = [
+  {
+    title: "Team Management",
+    url: "/team-management",
+    icon: Users,
+  },
   {
     title: "Security",
     url: "/security",
