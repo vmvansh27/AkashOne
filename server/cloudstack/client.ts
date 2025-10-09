@@ -265,6 +265,74 @@ export class CloudStackClient {
   }
 
   // ============================================
+  // VM SNAPSHOTS
+  // ============================================
+
+  /**
+   * Create a VM snapshot
+   * Captures entire VM state including all disks and optionally memory
+   */
+  async createVMSnapshot(vmId: string, name: string, description?: string, snapshotMemory: boolean = true): Promise<any> {
+    const response = await this.request("createVMSnapshot", {
+      virtualmachineid: vmId,
+      name,
+      description: description || "",
+      snapshotmemory: snapshotMemory,
+    });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response.vmsnapshot;
+  }
+
+  /**
+   * List VM snapshots
+   */
+  async listVMSnapshots(vmId?: string): Promise<any> {
+    const params: any = {};
+    if (vmId) {
+      params.virtualmachineid = vmId;
+    }
+    
+    const result = await this.request("listVMSnapshots", params);
+    return result.vmsnapshot || [];
+  }
+
+  /**
+   * Delete a VM snapshot
+   * This is an async operation - polls job until completion
+   */
+  async deleteVMSnapshot(snapshotId: string): Promise<any> {
+    const response = await this.request("deleteVMSnapshot", {
+      vmsnapshotid: snapshotId,
+    });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response;
+  }
+
+  /**
+   * Revert VM to a snapshot
+   * This is an async operation - polls job until completion
+   */
+  async revertToVMSnapshot(snapshotId: string): Promise<any> {
+    const response = await this.request("revertToVMSnapshot", {
+      vmsnapshotid: snapshotId,
+    });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response.vmsnapshot;
+  }
+
+  // ============================================
   // NETWORK - IPs, Firewall, Load Balancing
   // ============================================
 

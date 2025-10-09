@@ -163,3 +163,23 @@ export type DnsRecord = typeof dnsRecords.$inferSelect;
 export type InsertDnsRecord = z.infer<typeof insertDnsRecordSchema>;
 export type VirtualMachine = typeof virtualMachines.$inferSelect;
 export type InsertVirtualMachine = z.infer<typeof insertVirtualMachineSchema>;
+
+export const vmSnapshots = pgTable("vm_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackSnapshotId: varchar("cloudstack_snapshot_id", { length: 255 }).notNull().unique(),
+  vmId: varchar("vm_id").references(() => virtualMachines.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  state: varchar("state", { length: 50 }).notNull(),
+  snapshotMemory: boolean("snapshot_memory").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertVMSnapshotSchema = createInsertSchema(vmSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type VMSnapshot = typeof vmSnapshots.$inferSelect;
+export type InsertVMSnapshot = z.infer<typeof insertVMSnapshotSchema>;
