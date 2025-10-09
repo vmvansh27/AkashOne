@@ -42,7 +42,6 @@ const menuItems: MenuItem[] = [
     title: "Kubernetes",
     url: "/kubernetes",
     icon: Boxes,
-    featureKey: "kubernetes",
   },
   {
     title: "Database",
