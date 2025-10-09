@@ -637,11 +637,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Call CloudStack API to deploy VM
+      // Call CloudStack API to deploy VM (polls async job until complete)
       const { getCloudStackClient } = await import("./cloudstack/client");
       const cloudstack = getCloudStackClient();
       
-      const deployResult = await cloudstack.deployVirtualMachine({
+      const jobResult = await cloudstack.deployVirtualMachine({
         name,
         displayName: displayName || name,
         templateId,
@@ -650,24 +650,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         networkIds: networkIds || [],
       });
 
-      const vmData = deployResult.virtualmachine;
+      // After async job completes, extract VM data from job result
+      const vmData = jobResult.virtualmachine;
+      
+      if (!vmData) {
+        throw new Error("VM deployment completed but no VM data returned");
+      }
 
       // Cache VM in our database
       const vm = await storage.createVirtualMachine({
         cloudstackId: vmData.id,
         name: vmData.name,
-        displayName: vmData.displayname,
+        displayName: vmData.displayname || vmData.name,
         state: vmData.state,
         templateId: vmData.templateid,
-        templateName: vmData.templatename,
+        templateName: vmData.templatename || null,
         serviceOfferingId: vmData.serviceofferingid,
-        serviceOfferingName: vmData.serviceofferingname,
+        serviceOfferingName: vmData.serviceofferingname || null,
         zoneId: vmData.zoneid,
-        zoneName: vmData.zonename,
-        cpu: vmData.cpunumber,
-        memory: vmData.memory,
-        ipAddress: vmData.nic?.[0]?.ipaddress,
-        networkIds: vmData.nic?.map((n: any) => n.networkid),
+        zoneName: vmData.zonename || null,
+        cpu: vmData.cpunumber || 1,
+        memory: vmData.memory || 512,
+        ipAddress: vmData.nic?.[0]?.ipaddress || null,
+        networkIds: vmData.nic?.map((n: any) => n.networkid) || null,
         userId: req.session.userId,
       });
 
@@ -695,13 +700,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Call CloudStack API
+      // Call CloudStack API (polls async job until complete)
       const { getCloudStackClient } = await import("./cloudstack/client");
       const cloudstack = getCloudStackClient();
-      await cloudstack.startVirtualMachine(vm.cloudstackId);
+      const jobResult = await cloudstack.startVirtualMachine(vm.cloudstackId);
 
-      // Update state in cache
-      await storage.updateVirtualMachine(id, { state: "Starting" });
+      // Update state from job result
+      const vmData = jobResult.virtualmachine;
+      if (vmData) {
+        await storage.updateVirtualMachine(id, { 
+          state: vmData.state,
+          ipAddress: vmData.nic?.[0]?.ipaddress || vm.ipAddress,
+        });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -727,13 +738,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Call CloudStack API
+      // Call CloudStack API (polls async job until complete)
       const { getCloudStackClient } = await import("./cloudstack/client");
       const cloudstack = getCloudStackClient();
-      await cloudstack.stopVirtualMachine(vm.cloudstackId);
+      const jobResult = await cloudstack.stopVirtualMachine(vm.cloudstackId);
 
-      // Update state in cache
-      await storage.updateVirtualMachine(id, { state: "Stopping" });
+      // Update state from job result
+      const vmData = jobResult.virtualmachine;
+      if (vmData) {
+        await storage.updateVirtualMachine(id, { state: vmData.state });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -759,10 +773,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Call CloudStack API
+      // Call CloudStack API (polls async job until complete)
       const { getCloudStackClient } = await import("./cloudstack/client");
       const cloudstack = getCloudStackClient();
-      await cloudstack.rebootVirtualMachine(vm.cloudstackId);
+      const jobResult = await cloudstack.rebootVirtualMachine(vm.cloudstackId);
+
+      // Update state from job result
+      const vmData = jobResult.virtualmachine;
+      if (vmData) {
+        await storage.updateVirtualMachine(id, { state: vmData.state });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -788,12 +808,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Call CloudStack API
+      // Call CloudStack API (polls async job until complete)
       const { getCloudStackClient } = await import("./cloudstack/client");
       const cloudstack = getCloudStackClient();
       await cloudstack.destroyVirtualMachine(vm.cloudstackId, true);
 
-      // Remove from cache
+      // Remove from cache after successful destruction
       await storage.deleteVirtualMachine(id);
 
       res.json({ success: true });

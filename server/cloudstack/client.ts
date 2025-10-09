@@ -85,6 +85,31 @@ export class CloudStackClient {
     }
   }
 
+  /**
+   * Poll an async job until completion
+   * CloudStack async operations return a jobid that needs to be polled
+   */
+  async pollAsyncJob(jobId: string, maxAttempts: number = 60, intervalMs: number = 2000): Promise<any> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const result = await this.request("queryAsyncJobResult", { jobid: jobId });
+      
+      // Job status: 0 = pending, 1 = success, 2 = failure
+      if (result.jobstatus === 1) {
+        // Job completed successfully
+        return result.jobresult;
+      } else if (result.jobstatus === 2) {
+        // Job failed
+        const errorMessage = result.jobresult?.errortext || result.jobresult?.errorcode || "Job failed";
+        throw new Error(`CloudStack job failed: ${errorMessage}`);
+      }
+      
+      // Job still pending, wait before next poll
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    
+    throw new Error(`CloudStack job ${jobId} timed out after ${maxAttempts} attempts`);
+  }
+
   // ============================================
   // COMPUTE - Virtual Machines
   // ============================================
@@ -114,6 +139,7 @@ export class CloudStackClient {
 
   /**
    * Deploy a new virtual machine
+   * This is an async operation - polls job until completion
    */
   async deployVirtualMachine(params: {
     serviceOfferingId: string;
@@ -137,7 +163,14 @@ export class CloudStackClient {
     if (params.keyPair) requestParams.keypair = params.keyPair;
     if (params.userData) requestParams.userdata = Buffer.from(params.userData).toString("base64");
 
-    return this.request("deployVirtualMachine", requestParams);
+    const response = await this.request("deployVirtualMachine", requestParams);
+    
+    // CloudStack returns a job ID - poll until complete
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response;
   }
 
   /**
@@ -160,40 +193,75 @@ export class CloudStackClient {
 
   /**
    * Start a virtual machine
+   * This is an async operation - polls job until completion
    */
   async startVirtualMachine(id: string): Promise<any> {
-    return this.request("startVirtualMachine", { id });
+    const response = await this.request("startVirtualMachine", { id });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response;
   }
 
   /**
    * Stop a virtual machine
+   * This is an async operation - polls job until completion
    */
   async stopVirtualMachine(id: string, forced: boolean = false): Promise<any> {
-    return this.request("stopVirtualMachine", { id, forced });
+    const response = await this.request("stopVirtualMachine", { id, forced });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response;
   }
 
   /**
    * Reboot a virtual machine
+   * This is an async operation - polls job until completion
    */
   async rebootVirtualMachine(id: string): Promise<any> {
-    return this.request("rebootVirtualMachine", { id });
+    const response = await this.request("rebootVirtualMachine", { id });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response;
   }
 
   /**
    * Destroy a virtual machine
+   * This is an async operation - polls job until completion
    */
   async destroyVirtualMachine(id: string, expunge: boolean = false): Promise<any> {
-    return this.request("destroyVirtualMachine", { id, expunge });
+    const response = await this.request("destroyVirtualMachine", { id, expunge });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response;
   }
 
   /**
    * Scale virtual machine (change service offering)
+   * This is an async operation - polls job until completion
    */
   async scaleVirtualMachine(id: string, serviceOfferingId: string): Promise<any> {
-    return this.request("scaleVirtualMachine", {
+    const response = await this.request("scaleVirtualMachine", {
       id,
       serviceofferingid: serviceOfferingId,
     });
+    
+    if (response.jobid) {
+      return this.pollAsyncJob(response.jobid);
+    }
+    
+    return response;
   }
 
   // ============================================
