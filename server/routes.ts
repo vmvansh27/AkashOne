@@ -705,16 +705,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cloudstack = getCloudStackClient();
       const jobResult = await cloudstack.startVirtualMachine(vm.cloudstackId);
 
-      // Update state from job result
+      // Update state from job result and return updated VM
       const vmData = jobResult.virtualmachine;
+      let updatedVM = vm;
       if (vmData) {
-        await storage.updateVirtualMachine(id, { 
+        updatedVM = await storage.updateVirtualMachine(id, { 
           state: vmData.state,
           ipAddress: vmData.nic?.[0]?.ipaddress || vm.ipAddress,
-        });
+        }) || vm;
       }
 
-      res.json({ success: true });
+      res.json(updatedVM);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -743,13 +744,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cloudstack = getCloudStackClient();
       const jobResult = await cloudstack.stopVirtualMachine(vm.cloudstackId);
 
-      // Update state from job result
+      // Update state from job result and return updated VM
       const vmData = jobResult.virtualmachine;
+      let updatedVM = vm;
       if (vmData) {
-        await storage.updateVirtualMachine(id, { state: vmData.state });
+        updatedVM = await storage.updateVirtualMachine(id, { state: vmData.state }) || vm;
       }
 
-      res.json({ success: true });
+      res.json(updatedVM);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -778,13 +780,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cloudstack = getCloudStackClient();
       const jobResult = await cloudstack.rebootVirtualMachine(vm.cloudstackId);
 
-      // Update state from job result
+      // Update state from job result and return updated VM
       const vmData = jobResult.virtualmachine;
+      let updatedVM = vm;
       if (vmData) {
-        await storage.updateVirtualMachine(id, { state: vmData.state });
+        updatedVM = await storage.updateVirtualMachine(id, { state: vmData.state }) || vm;
       }
 
-      res.json({ success: true });
+      res.json(updatedVM);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
