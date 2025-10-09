@@ -1,88 +1,225 @@
 import { useState } from "react";
-import { VMTable, VirtualMachine } from "@/components/vm-table";
-import { CreateVMDialog } from "@/components/create-vm-dialog";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertVirtualMachineSchema, type VirtualMachine } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Search,
+  Play,
+  Square,
+  RotateCw,
+  Trash2,
+  Server,
+  Cpu,
+  MemoryStick,
+  Network,
+  Plus,
+} from "lucide-react";
+import { z } from "zod";
 
-//todo: remove mock functionality
-const mockVMs: VirtualMachine[] = [
-  {
-    id: "vm-001",
-    name: "web-server-01",
-    status: "running",
-    ip: "10.0.1.10",
-    template: "Ubuntu 22.04 LTS",
-    cpu: "2 vCPU",
-    memory: "4GB",
-    zone: "Zone 1",
-  },
-  {
-    id: "vm-002",
-    name: "db-primary",
-    status: "running",
-    ip: "10.0.1.15",
-    template: "CentOS 8",
-    cpu: "4 vCPU",
-    memory: "8GB",
-    zone: "Zone 1",
-  },
-  {
-    id: "vm-003",
-    name: "app-server-02",
-    status: "stopped",
-    ip: "10.0.1.20",
-    template: "Ubuntu 22.04 LTS",
-    cpu: "2 vCPU",
-    memory: "4GB",
-    zone: "Zone 2",
-  },
-  {
-    id: "vm-004",
-    name: "cache-redis-01",
-    status: "running",
-    ip: "10.0.2.5",
-    template: "Debian 11",
-    cpu: "1 vCPU",
-    memory: "2GB",
-    zone: "Zone 1",
-  },
-  {
-    id: "vm-005",
-    name: "backup-server",
-    status: "error",
-    ip: "10.0.2.10",
-    template: "Windows Server 2022",
-    cpu: "2 vCPU",
-    memory: "4GB",
-    zone: "Zone 3",
-  },
-];
+// Form schema for VM creation
+const createVMSchema = insertVirtualMachineSchema
+  .omit({
+    cloudstackId: true,
+    state: true,
+    templateName: true,
+    serviceOfferingName: true,
+    zoneName: true,
+    diskSize: true,
+    ipAddress: true,
+    publicIp: true,
+    networkIds: true,
+    tags: true,
+  })
+  .extend({
+    displayName: z.string().optional(),
+  });
+
+type CreateVMFormData = z.infer<typeof createVMSchema>;
+
+// State badge colors
+const getStateBadgeVariant = (state: string) => {
+  const stateMap: Record<string, "default" | "secondary" | "destructive"> = {
+    Running: "default",
+    Stopped: "secondary",
+    Starting: "secondary",
+    Stopping: "secondary",
+    Creating: "secondary",
+    Error: "destructive",
+    Destroyed: "destructive",
+  };
+  return stateMap[state] || "secondary";
+};
 
 export default function VirtualMachines() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleVMAction = (action: string, vmId: string) => {
-    console.log(`Action ${action} on VM ${vmId}`);
-    toast({
-      title: `VM Action: ${action}`,
-      description: `Executing ${action} on virtual machine ${vmId}`,
-    });
+  // Fetch VMs
+  const { data: vms = [], isLoading: vmsLoading } = useQuery<VirtualMachine[]>({
+    queryKey: ["/api/vms"],
+  });
+
+  // Fetch CloudStack metadata for provisioning
+  const { data: zones = [] } = useQuery<any[]>({
+    queryKey: ["/api/cloudstack/zones"],
+    enabled: createDialogOpen,
+  });
+
+  const { data: serviceOfferings = [] } = useQuery<any[]>({
+    queryKey: ["/api/cloudstack/service-offerings"],
+    enabled: createDialogOpen,
+  });
+
+  const [selectedZone, setSelectedZone] = useState<string>("");
+  const { data: templates = [] } = useQuery<any[]>({
+    queryKey: ["/api/cloudstack/templates", selectedZone],
+    enabled: createDialogOpen && !!selectedZone,
+  });
+
+  // Create VM mutation
+  const createVMMutation = useMutation({
+    mutationFn: async (data: CreateVMFormData) => {
+      const res = await apiRequest("POST", "/api/vms", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms"] });
+      setCreateDialogOpen(false);
+      toast({
+        title: "VM Created",
+        description: "Virtual machine has been deployed successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // VM lifecycle mutations
+  const startVMMutation = useMutation({
+    mutationFn: async (vmId: string) => {
+      const res = await apiRequest("POST", `/api/vms/${vmId}/start`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms"] });
+      toast({ title: "VM Started", description: "Virtual machine is now running" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const stopVMMutation = useMutation({
+    mutationFn: async (vmId: string) => {
+      const res = await apiRequest("POST", `/api/vms/${vmId}/stop`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms"] });
+      toast({ title: "VM Stopped", description: "Virtual machine has been stopped" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const rebootVMMutation = useMutation({
+    mutationFn: async (vmId: string) => {
+      const res = await apiRequest("POST", `/api/vms/${vmId}/reboot`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms"] });
+      toast({ title: "VM Rebooted", description: "Virtual machine is rebooting" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const destroyVMMutation = useMutation({
+    mutationFn: async (vmId: string) => {
+      const res = await apiRequest("DELETE", `/api/vms/${vmId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms"] });
+      toast({ title: "VM Destroyed", description: "Virtual machine has been deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Form for creating VM
+  const form = useForm<CreateVMFormData>({
+    resolver: zodResolver(createVMSchema),
+    defaultValues: {
+      name: "",
+      displayName: "",
+      templateId: "",
+      serviceOfferingId: "",
+      zoneId: "",
+      cpu: 1,
+      memory: 512,
+    },
+  });
+
+  const onSubmit = (data: CreateVMFormData) => {
+    createVMMutation.mutate(data);
   };
 
-  const handleCreateVM = (data: any) => {
-    console.log("Creating VM with data:", data);
-    toast({
-      title: "VM Creation Started",
-      description: `Creating virtual machine: ${data.name}`,
-    });
-  };
-
-  const filteredVMs = mockVMs.filter((vm) =>
-    vm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    vm.ip.includes(searchQuery) ||
-    vm.template.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter VMs by search query
+  const filteredVMs = vms.filter(
+    (vm) =>
+      vm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vm.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vm.ipAddress?.includes(searchQuery) ||
+      vm.state.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -91,17 +228,212 @@ export default function VirtualMachines() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Virtual Machines</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your virtual machine instances
+            Manage and monitor your virtual machine instances
           </p>
         </div>
-        <CreateVMDialog onCreateVM={handleCreateVM} />
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-vm">
+              <Plus className="h-4 w-4" />
+              Create VM
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Deploy Virtual Machine</DialogTitle>
+              <DialogDescription>
+                Configure and deploy a new virtual machine instance
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="web-server-01"
+                            {...field}
+                            data-testid="input-vm-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="displayName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Display Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Web Server 01"
+                            {...field}
+                            data-testid="input-vm-display-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="zoneId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zone</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          setSelectedZone(value);
+                          // Reset template when zone changes to prevent mismatch
+                          form.setValue("templateId", "");
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-zone">
+                            <SelectValue placeholder="Select a zone" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {zones.map((zone: any) => (
+                            <SelectItem key={zone.id} value={zone.id}>
+                              {zone.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="templateId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Template</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-template">
+                            <SelectValue placeholder="Select OS template" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {templates.map((template: any) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="serviceOfferingId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Service Offering</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-service-offering">
+                            <SelectValue placeholder="Select compute plan" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {serviceOfferings.map((offering: any) => (
+                            <SelectItem key={offering.id} value={offering.id}>
+                              {offering.name} ({offering.cpunumber} CPU, {offering.memory}MB RAM)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="cpu"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPU Cores</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            data-testid="input-cpu"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="memory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Memory (MB)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            data-testid="input-memory"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCreateDialogOpen(false)}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createVMMutation.isPending}
+                    data-testid="button-deploy-vm"
+                  >
+                    {createVMMutation.isPending ? "Deploying..." : "Deploy VM"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search VMs by name, IP, or template..."
+            placeholder="Search VMs by name, IP, or state..."
             className="pl-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -110,7 +442,125 @@ export default function VirtualMachines() {
         </div>
       </div>
 
-      <VMTable vms={filteredVMs} onAction={handleVMAction} />
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            Virtual Machines ({filteredVMs.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {vmsLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading VMs...</div>
+          ) : filteredVMs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {vms.length === 0 ? "No virtual machines yet. Create one to get started." : "No VMs match your search."}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead>IP Address</TableHead>
+                  <TableHead>Resources</TableHead>
+                  <TableHead>Zone</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredVMs.map((vm) => (
+                  <TableRow key={vm.id} data-testid={`row-vm-${vm.id}`}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium" data-testid={`text-vm-name-${vm.id}`}>
+                          {vm.displayName || vm.name}
+                        </div>
+                        {vm.displayName && vm.displayName !== vm.name && (
+                          <div className="text-sm text-muted-foreground">{vm.name}</div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStateBadgeVariant(vm.state)} data-testid={`badge-state-${vm.id}`}>
+                        {vm.state}
+                      </Badge>
+                    </TableCell>
+                    <TableCell data-testid={`text-ip-${vm.id}`}>
+                      {vm.ipAddress || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1 text-sm">
+                        <div className="flex items-center gap-1">
+                          <Cpu className="h-3 w-3 text-muted-foreground" />
+                          <span>{vm.cpu} CPU</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MemoryStick className="h-3 w-3 text-muted-foreground" />
+                          <span>{vm.memory}MB</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell data-testid={`text-zone-${vm.id}`}>
+                      {vm.zoneName || vm.zoneId}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {vm.state === "Stopped" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startVMMutation.mutate(vm.id)}
+                            disabled={startVMMutation.isPending}
+                            data-testid={`button-start-${vm.id}`}
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {vm.state === "Running" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => stopVMMutation.mutate(vm.id)}
+                              disabled={stopVMMutation.isPending}
+                              data-testid={`button-stop-${vm.id}`}
+                            >
+                              <Square className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => rebootVMMutation.mutate(vm.id)}
+                              disabled={rebootVMMutation.isPending}
+                              data-testid={`button-reboot-${vm.id}`}
+                            >
+                              <RotateCw className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to destroy ${vm.displayName || vm.name}?`)) {
+                              destroyVMMutation.mutate(vm.id);
+                            }
+                          }}
+                          disabled={destroyVMMutation.isPending}
+                          data-testid={`button-destroy-${vm.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
