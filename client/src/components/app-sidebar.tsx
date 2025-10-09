@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +23,16 @@ const menuItems = [
     title: "Virtual Machines",
     url: "/vms",
     icon: Server,
+  },
+  {
+    title: "Kubernetes",
+    url: "/kubernetes",
+    icon: Boxes,
+  },
+  {
+    title: "Database",
+    url: "/database",
+    icon: Database,
   },
   {
     title: "Networks",

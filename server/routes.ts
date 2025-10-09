@@ -166,6 +166,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Kubernetes Cluster endpoints
+  app.get("/api/kubernetes/clusters", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const clusters = await storage.getKubernetesClusters(req.session.userId);
+      res.json(clusters);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/kubernetes/clusters", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { name, version, region, masterNodes, workerNodes, instanceType, autoHealing, autoScaling } = req.body;
+
+      if (!name || !version || !region || !instanceType) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const cluster = await storage.createKubernetesCluster({
+        name,
+        version,
+        region,
+        masterNodes: parseInt(masterNodes) || 3,
+        workerNodes: parseInt(workerNodes) || 3,
+        instanceType,
+        autoHealing: autoHealing !== false,
+        autoScaling: autoScaling === true,
+        status: "running",
+        cpuTotal: 0,
+        memoryTotal: 0,
+        userId: req.session.userId,
+      });
+
+      res.json(cluster);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/kubernetes/clusters/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const updates = req.body;
+
+      const cluster = await storage.updateKubernetesCluster(id, updates);
+
+      if (!cluster) {
+        return res.status(404).json({ message: "Cluster not found" });
+      }
+
+      res.json(cluster);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/kubernetes/clusters/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const deleted = await storage.deleteKubernetesCluster(id);
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Cluster not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Database endpoints
+  app.get("/api/databases", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const databases = await storage.getDatabases(req.session.userId);
+      res.json(databases);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/databases", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { name, engine, version, region, storage, cpu, memory, instanceType, backupEnabled, multiAZ } = req.body;
+
+      if (!name || !engine || !version || !region || !instanceType) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const database = await storage.createDatabase({
+        name,
+        engine,
+        version,
+        region,
+        storage: parseInt(storage) || 100,
+        cpu: parseInt(cpu) || 2,
+        memory: parseInt(memory) || 8,
+        instanceType,
+        backupEnabled: backupEnabled !== false,
+        multiAZ: multiAZ === true,
+        status: "running",
+        port: 5432,
+        connectionsMax: 200,
+        userId: req.session.userId,
+      });
+
+      res.json(database);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/databases/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const updates = req.body;
+
+      const database = await storage.updateDatabase(id, updates);
+
+      if (!database) {
+        return res.status(404).json({ message: "Database not found" });
+      }
+
+      res.json(database);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/databases/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const deleted = await storage.deleteDatabase(id);
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Database not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

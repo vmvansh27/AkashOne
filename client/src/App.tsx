@@ -21,6 +21,8 @@ import AdminRights from "@/pages/admin-rights";
 import AllVMs from "@/pages/all-vms";
 import AllKubernetes from "@/pages/all-kubernetes";
 import SecuritySettings from "@/pages/security-settings";
+import Kubernetes from "@/pages/kubernetes";
+import Database from "@/pages/database";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { useQuery } from "@tanstack/react-query";
@@ -47,6 +49,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/vms" component={VirtualMachines} />
+      <Route path="/kubernetes" component={Kubernetes} />
+      <Route path="/database" component={Database} />
       <Route path="/networks" component={Networks} />
       <Route path="/storage" component={Storage} />
       <Route path="/monitoring" component={Monitoring} />
