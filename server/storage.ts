@@ -11,6 +11,8 @@ import {
   type InsertDnsRecord,
   type VirtualMachine,
   type InsertVirtualMachine,
+  type VMSnapshot,
+  type InsertVMSnapshot,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -59,6 +61,13 @@ export interface IStorage {
   createVirtualMachine(vm: InsertVirtualMachine & { userId: string }): Promise<VirtualMachine>;
   updateVirtualMachine(id: string, data: Partial<VirtualMachine>): Promise<VirtualMachine | undefined>;
   deleteVirtualMachine(id: string): Promise<boolean>;
+
+  // VM Snapshots
+  getVMSnapshots(vmId: string, userId: string): Promise<VMSnapshot[]>;
+  getVMSnapshot(id: string): Promise<VMSnapshot | undefined>;
+  getVMSnapshotByCloudstackId(cloudstackSnapshotId: string): Promise<VMSnapshot | undefined>;
+  createVMSnapshot(snapshot: InsertVMSnapshot): Promise<VMSnapshot>;
+  deleteVMSnapshot(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -68,6 +77,7 @@ export class MemStorage implements IStorage {
   private dnsDomains: Map<string, DnsDomain>;
   private dnsRecords: Map<string, DnsRecord>;
   private virtualMachines: Map<string, VirtualMachine>;
+  private vmSnapshots: Map<string, VMSnapshot>;
 
   constructor() {
     this.users = new Map();
@@ -76,6 +86,7 @@ export class MemStorage implements IStorage {
     this.dnsDomains = new Map();
     this.dnsRecords = new Map();
     this.virtualMachines = new Map();
+    this.vmSnapshots = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -401,6 +412,38 @@ export class MemStorage implements IStorage {
 
   async deleteVirtualMachine(id: string): Promise<boolean> {
     return this.virtualMachines.delete(id);
+  }
+
+  // VM Snapshots
+  async getVMSnapshots(vmId: string, userId: string): Promise<VMSnapshot[]> {
+    return Array.from(this.vmSnapshots.values()).filter(
+      (snapshot) => snapshot.vmId === vmId && snapshot.userId === userId
+    );
+  }
+
+  async getVMSnapshot(id: string): Promise<VMSnapshot | undefined> {
+    return this.vmSnapshots.get(id);
+  }
+
+  async getVMSnapshotByCloudstackId(cloudstackSnapshotId: string): Promise<VMSnapshot | undefined> {
+    return Array.from(this.vmSnapshots.values()).find(
+      (snapshot) => snapshot.cloudstackSnapshotId === cloudstackSnapshotId
+    );
+  }
+
+  async createVMSnapshot(snapshot: InsertVMSnapshot): Promise<VMSnapshot> {
+    const id = randomUUID();
+    const newSnapshot: VMSnapshot = {
+      ...snapshot,
+      id,
+      createdAt: new Date(),
+    };
+    this.vmSnapshots.set(id, newSnapshot);
+    return newSnapshot;
+  }
+
+  async deleteVMSnapshot(id: string): Promise<boolean> {
+    return this.vmSnapshots.delete(id);
   }
 }
 
