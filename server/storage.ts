@@ -9,6 +9,8 @@ import {
   type InsertDnsDomain,
   type DnsRecord,
   type InsertDnsRecord,
+  type VirtualMachine,
+  type InsertVirtualMachine,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -49,6 +51,14 @@ export interface IStorage {
   createDnsRecord(record: InsertDnsRecord & { userId: string }): Promise<DnsRecord>;
   updateDnsRecord(id: string, data: Partial<DnsRecord>): Promise<DnsRecord | undefined>;
   deleteDnsRecord(id: string): Promise<boolean>;
+
+  // Virtual Machines
+  getVirtualMachines(userId: string): Promise<VirtualMachine[]>;
+  getVirtualMachine(id: string): Promise<VirtualMachine | undefined>;
+  getVirtualMachineByCloudstackId(cloudstackId: string): Promise<VirtualMachine | undefined>;
+  createVirtualMachine(vm: InsertVirtualMachine & { userId: string }): Promise<VirtualMachine>;
+  updateVirtualMachine(id: string, data: Partial<VirtualMachine>): Promise<VirtualMachine | undefined>;
+  deleteVirtualMachine(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -57,6 +67,7 @@ export class MemStorage implements IStorage {
   private databases: Map<string, Database>;
   private dnsDomains: Map<string, DnsDomain>;
   private dnsRecords: Map<string, DnsRecord>;
+  private virtualMachines: Map<string, VirtualMachine>;
 
   constructor() {
     this.users = new Map();
@@ -64,6 +75,7 @@ export class MemStorage implements IStorage {
     this.databases = new Map();
     this.dnsDomains = new Map();
     this.dnsRecords = new Map();
+    this.virtualMachines = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -331,6 +343,64 @@ export class MemStorage implements IStorage {
     }
     
     return this.dnsRecords.delete(id);
+  }
+
+  // Virtual Machine methods
+  async getVirtualMachines(userId: string): Promise<VirtualMachine[]> {
+    return Array.from(this.virtualMachines.values()).filter(
+      (vm) => vm.userId === userId,
+    );
+  }
+
+  async getVirtualMachine(id: string): Promise<VirtualMachine | undefined> {
+    return this.virtualMachines.get(id);
+  }
+
+  async getVirtualMachineByCloudstackId(cloudstackId: string): Promise<VirtualMachine | undefined> {
+    return Array.from(this.virtualMachines.values()).find(
+      (vm) => vm.cloudstackId === cloudstackId,
+    );
+  }
+
+  async createVirtualMachine(vm: InsertVirtualMachine & { userId: string }): Promise<VirtualMachine> {
+    const id = `vm-${randomUUID().slice(0, 8)}`;
+    const newVM: VirtualMachine = {
+      id,
+      cloudstackId: vm.cloudstackId,
+      name: vm.name,
+      displayName: vm.displayName || vm.name,
+      state: vm.state || "Creating",
+      templateId: vm.templateId,
+      templateName: vm.templateName || null,
+      serviceOfferingId: vm.serviceOfferingId,
+      serviceOfferingName: vm.serviceOfferingName || null,
+      zoneId: vm.zoneId,
+      zoneName: vm.zoneName || null,
+      cpu: vm.cpu,
+      memory: vm.memory,
+      diskSize: vm.diskSize || null,
+      ipAddress: vm.ipAddress || null,
+      publicIp: vm.publicIp || null,
+      networkIds: vm.networkIds || null,
+      tags: vm.tags || null,
+      createdAt: new Date(),
+      lastSynced: new Date(),
+      userId: vm.userId,
+    };
+    this.virtualMachines.set(id, newVM);
+    return newVM;
+  }
+
+  async updateVirtualMachine(id: string, data: Partial<VirtualMachine>): Promise<VirtualMachine | undefined> {
+    const vm = this.virtualMachines.get(id);
+    if (!vm) return undefined;
+    const updatedVM = { ...vm, ...data, lastSynced: new Date() };
+    this.virtualMachines.set(id, updatedVM);
+    return updatedVM;
+  }
+
+  async deleteVirtualMachine(id: string): Promise<boolean> {
+    return this.virtualMachines.delete(id);
   }
 }
 

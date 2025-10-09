@@ -1,0 +1,343 @@
+Phase plan
+Phase 0. Foundations
+
+Tenancy model: Provider → Reseller → Customer (domains/projects map to CloudStack).
+
+RBAC: Provider-Admin, Reseller-Admin, Org-Admin, User, ReadOnly, Billing-Only, Support.
+
+Core services: Auth (JWT + refresh), API-gateway, Usage collector, Pricing engine, Event bus, Audit log.
+
+DevOps: Docker images, Helm charts, Git CI, staging env, seed data, feature flags.
+
+Phase 1. Sell and run (MVP, revenue first)
+
+Goals: Self-service IaaS with automated billing. Zero-touch VM provisioning.
+Modules:
+
+Signup and KYC
+
+Email OTP, GST/TAX fields, invoices profile, reseller onboarding.
+
+Catalog and Offers
+
+VM offerings, disk offerings, network offerings, templates.
+
+Region/zone availability matrix.
+
+Add-ons: public IP pack, backup pack, snapshot pack.
+
+Order → Pay → Provision
+
+Configurator (CPU, RAM, disk, zone, template, SSH key).
+
+Pricing preview. Taxes. Coupons.
+
+Payment gateways: Razorpay, Stripe.
+
+Wallet. Auto top-up option.
+
+On success: call CloudStack deployVirtualMachine.
+
+VM lifecycle
+
+Start, stop, reboot, destroy, scale VM (service offering).
+
+Console via CloudStack console proxy.
+
+User data, ISO attach, password reset.
+
+Tags for cost centers and projects.
+
+Network
+
+Acquire public IP. Port forward. NAT. Firewall rules. LB rules. VPNs.
+
+Security groups where applicable.
+
+Storage
+
+Volumes: create, attach, detach, resize.
+
+Snapshots: create, schedule, restore.
+
+Backups to S3-compatible (MinIO or provider S3). Policy based.
+
+Billing and usage
+
+Usage collector polls CloudStack listUsageRecords.
+
+Pricing engine:
+
+VM compute ₹/vCPU-hr + ₹/GB-RAM-hr.
+
+Storage ₹/GB-month prorated to hr.
+
+Public IP ₹/IP-day or hr.
+
+Egress GB tiered.
+
+Invoices monthly. Pro-forma daily.
+
+Wallet debit hourly. Grace period and suspend policy.
+
+PDF invoices. HSN/SAC. GST fields.
+
+Webhooks for external ERP.
+
+Reseller
+
+Create child tenants. Set sell price and discount floor.
+
+White-label theme and domain.
+
+Revenue share report.
+
+Support
+
+Tickets with file upload.
+
+Notices and maintenance banner.
+
+Admin panel
+
+Users and roles. Tenants. Suspend/unsuspend.
+
+Pricing tables. Tax. Coupons.
+
+Zones, templates visibility.
+
+Audit trail.
+
+Reports: MRR, ARPU, churn, top templates.
+
+Phase 2. Operate and scale (ops first)
+
+Goals: Deep admin control, multi-cloud, monitoring, automation.
+
+Cloud admin
+
+Inventory: zones, pods, clusters, hosts, system VMs, capacity.
+
+Host maintenance, enable/disable, evacuate.
+
+Template and ISO library management.
+
+Global offerings CRUD with guardrails.
+
+Monitoring and alerts
+
+Metrics ingest from Prometheus node exporter or Zabbix.
+
+VM and host graphs. Threshold alerts.
+
+Status page per region.
+
+Incident webhooks to Slack, Teams, Telegram, email.
+
+Auto-scale
+
+Policies on CPU, RAM, queue depth.
+
+Scale up/down service offering.
+
+Cooldown and budget guardrails.
+
+Backups and DR
+
+VM backup policies to S3 with immutability options.
+
+Cross-zone template replication.
+
+Restore workflows with approval.
+
+Marketplace
+
+Click-to-deploy apps. Cloud-init params form.
+
+Versioning. Publisher workflow.
+
+Multi-cloud API layer
+
+Optional connectors: OpenStack, Proxmox, VMware tag.
+
+Normalized compute API.
+
+Per-connector capability matrix.
+
+Compliance
+
+DPDP alignment. Data retention.
+
+PII minimization. Access reports.
+
+Downloadable audit logs.
+
+High-level architecture
+
+UI: React + Tailwind. Three portals: End-User, Reseller, Provider-Admin.
+
+API-Gateway: NestJS or FastAPI. Single JWT. Rate-limit.
+
+Services (microservices or modules):
+
+Identity and RBAC.
+
+CloudStack adapter (all API calls, retries, idempotency).
+
+Usage collector.
+
+Pricing and billing.
+
+Payments and wallet.
+
+Provisioner workers (BullMQ or RabbitMQ).
+
+Backup service (S3 SDK).
+
+Monitoring adapter (Prometheus or Zabbix).
+
+Notifications (SMTP, SMS, webhooks).
+
+Audit and reports.
+
+Data: PostgreSQL. Redis cache and queue. S3 for artifacts.
+
+Edge: Nginx ingress, TLS, WAF.
+
+Observability: Loki logs, Prometheus, Grafana, Sentry.
+
+Key CloudStack calls to implement
+
+Compute:
+
+listZones, listServiceOfferings, listTemplates
+
+deployVirtualMachine, startVirtualMachine, stopVirtualMachine, rebootVirtualMachine, destroyVirtualMachine
+
+scaleVirtualMachine, resetPasswordForVirtualMachine, getVMPassword
+
+Network:
+
+associateIpAddress, listPublicIpAddresses
+
+createFirewallRule, deleteFirewallRule
+
+createPortForwardingRule, createLoadBalancerRule, assignToLoadBalancerRule, createVPN, createSecurityGroup
+
+listNetworks, createNetwork, deleteNetwork
+
+Storage:
+
+listVolumes, createVolume, attachVolume, detachVolume, resizeVolume
+
+createSnapshot, listSnapshots, deleteSnapshot
+
+Templates and ISOs:
+
+registerTemplate, copyTemplate, listIsos, attachIso
+
+Admin and usage:
+
+listClusters, listHosts, prepareHostForMaintenance, cancelHostMaintenance
+
+listUsageRecords, listEvents, listAlerts
+
+Console:
+
+CloudStack console proxy handshake and WebSocket relay.
+
+Data model (core tables)
+
+tenants (type: provider, reseller, customer; parent_id).
+
+users (role, tenant_id, MFA).
+
+offerings (compute, disk, network).
+
+products (VM bundle SKUs, add-ons).
+
+orders, order_items, provisioning_jobs.
+
+instances (vm_id, tenant_id, tags, state, region).
+
+volumes, snapshots, public_ips, rules.
+
+usage_raw (pulled from CloudStack).
+
+pricing_rules (component, metric, slab, currency, tax).
+
+invoices, invoice_lines, wallet_ledger, payments.
+
+backups, backup_policies, s3_locations.
+
+alerts, tickets, audit_logs.
+
+Pricing logic
+
+Compute cost = (vCPU * rate_vcpu_hr + RAM_GB * rate_ram_hr) * hours_on.
+
+Disk cost = GB * rate_gb_month * hours/730.
+
+IP cost = rate_ip_hr * hours_allocated.
+
+Egress cost = sum(GB_tier_n * rate_n).
+
+Taxes added per tenant tax profile.
+
+Wallet billed hourly. Suspension thresholds configurable.
+
+Security
+
+OAuth2-compatible JWT. Short access token, long refresh.
+
+Per-tenant API keys for external use.
+
+RBAC on every endpoint.
+
+Signed webhooks.
+
+Audit every state change.
+
+CIS-style hardening checklist for servers.
+
+PII encryption at rest. KMS for secrets.
+
+Acceptance tests (sample)
+
+Create tenant → add wallet balance → order VM → pay → VM up within SLA.
+
+Scale VM up and cost reflects next cycle.
+
+Acquire IP, add port forward, verify reachability.
+
+Snapshot and restore results in bootable VM.
+
+Low wallet triggers warning at X, suspend at Y, unsuspend on recharge.
+
+Reseller creates child tenant with custom prices and sees margin reports.
+
+Admin places host in maintenance and evacuates instances.
+
+Metrics alerts fire and resolve on threshold.
+
+Deliverables checklist
+
+Source code for UI and services.
+
+OpenAPI spec for every API.
+
+Docker Compose and Helm.
+
+Seed data and demo mode.
+
+Postman collection.
+
+SSO option (OIDC).
+
+Runbooks: provisioning, billing close, incident.
+
+Admin and user manuals.
+
+Security and DPDP notes.
+
+UAT scripts and sign-off criteria.

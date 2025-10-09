@@ -560,6 +560,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Virtual Machines endpoints
+  // Get CloudStack zones (for provisioning wizard)
+  app.get("/api/cloudstack/zones", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      const result = await cloudstack.listZones();
+      res.json(result.zone || []);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get CloudStack templates (for provisioning wizard)
+  app.get("/api/cloudstack/templates", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { zoneId } = req.query;
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      const result = await cloudstack.listTemplates("featured", zoneId as string);
+      res.json(result.template || []);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get CloudStack service offerings (for provisioning wizard)
+  app.get("/api/cloudstack/service-offerings", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      const result = await cloudstack.listServiceOfferings();
+      res.json(result.serviceoffering || []);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // List virtual machines
+  app.get("/api/vms", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const vms = await storage.getVirtualMachines(req.session.userId);
+      res.json(vms);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Deploy a new virtual machine
+  app.post("/api/vms", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { name, displayName, templateId, serviceOfferingId, zoneId, networkIds } = req.body;
+
+      if (!name || !templateId || !serviceOfferingId || !zoneId) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Call CloudStack API to deploy VM
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      
+      const deployResult = await cloudstack.deployVirtualMachine({
+        name,
+        displayName: displayName || name,
+        templateId,
+        serviceOfferingId,
+        zoneId,
+        networkIds: networkIds || [],
+      });
+
+      const vmData = deployResult.virtualmachine;
+
+      // Cache VM in our database
+      const vm = await storage.createVirtualMachine({
+        cloudstackId: vmData.id,
+        name: vmData.name,
+        displayName: vmData.displayname,
+        state: vmData.state,
+        templateId: vmData.templateid,
+        templateName: vmData.templatename,
+        serviceOfferingId: vmData.serviceofferingid,
+        serviceOfferingName: vmData.serviceofferingname,
+        zoneId: vmData.zoneid,
+        zoneName: vmData.zonename,
+        cpu: vmData.cpunumber,
+        memory: vmData.memory,
+        ipAddress: vmData.nic?.[0]?.ipaddress,
+        networkIds: vmData.nic?.map((n: any) => n.networkid),
+        userId: req.session.userId,
+      });
+
+      res.json(vm);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Start a virtual machine
+  app.post("/api/vms/:id/start", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+
+      // Verify ownership
+      const vm = await storage.getVirtualMachine(id);
+      if (!vm) {
+        return res.status(404).json({ message: "VM not found" });
+      }
+      if (vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Call CloudStack API
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      await cloudstack.startVirtualMachine(vm.cloudstackId);
+
+      // Update state in cache
+      await storage.updateVirtualMachine(id, { state: "Starting" });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Stop a virtual machine
+  app.post("/api/vms/:id/stop", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+
+      // Verify ownership
+      const vm = await storage.getVirtualMachine(id);
+      if (!vm) {
+        return res.status(404).json({ message: "VM not found" });
+      }
+      if (vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Call CloudStack API
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      await cloudstack.stopVirtualMachine(vm.cloudstackId);
+
+      // Update state in cache
+      await storage.updateVirtualMachine(id, { state: "Stopping" });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Reboot a virtual machine
+  app.post("/api/vms/:id/reboot", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+
+      // Verify ownership
+      const vm = await storage.getVirtualMachine(id);
+      if (!vm) {
+        return res.status(404).json({ message: "VM not found" });
+      }
+      if (vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Call CloudStack API
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      await cloudstack.rebootVirtualMachine(vm.cloudstackId);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Destroy a virtual machine
+  app.delete("/api/vms/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+
+      // Verify ownership
+      const vm = await storage.getVirtualMachine(id);
+      if (!vm) {
+        return res.status(404).json({ message: "VM not found" });
+      }
+      if (vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Call CloudStack API
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      await cloudstack.destroyVirtualMachine(vm.cloudstackId, true);
+
+      // Remove from cache
+      await storage.deleteVirtualMachine(id);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

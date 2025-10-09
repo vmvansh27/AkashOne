@@ -81,6 +81,30 @@ export const dnsRecords = pgTable("dns_records", {
   userId: varchar("user_id").references(() => users.id),
 });
 
+export const virtualMachines = pgTable("virtual_machines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  displayName: text("display_name"),
+  state: text("state").notNull().default("Creating"),
+  templateId: varchar("template_id").notNull(),
+  templateName: text("template_name"),
+  serviceOfferingId: varchar("service_offering_id").notNull(),
+  serviceOfferingName: text("service_offering_name"),
+  zoneId: varchar("zone_id").notNull(),
+  zoneName: text("zone_name"),
+  cpu: integer("cpu").notNull(),
+  memory: integer("memory").notNull(),
+  diskSize: integer("disk_size"),
+  ipAddress: text("ip_address"),
+  publicIp: text("public_ip"),
+  networkIds: text("network_ids").array(),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastSynced: timestamp("last_synced").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
@@ -120,6 +144,13 @@ export const insertDnsRecordSchema = createInsertSchema(dnsRecords).omit({
   userId: true,
 });
 
+export const insertVirtualMachineSchema = createInsertSchema(virtualMachines).omit({
+  id: true,
+  createdAt: true,
+  lastSynced: true,
+  userId: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type KubernetesCluster = typeof kubernetesClusters.$inferSelect;
@@ -130,3 +161,5 @@ export type DnsDomain = typeof dnsDomains.$inferSelect;
 export type InsertDnsDomain = z.infer<typeof insertDnsDomainSchema>;
 export type DnsRecord = typeof dnsRecords.$inferSelect;
 export type InsertDnsRecord = z.infer<typeof insertDnsRecordSchema>;
+export type VirtualMachine = typeof virtualMachines.$inferSelect;
+export type InsertVirtualMachine = z.infer<typeof insertVirtualMachineSchema>;
