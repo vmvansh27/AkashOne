@@ -42,10 +42,10 @@ const mockAdmins: AdminUser[] = [
   {
     id: "admin-001",
     name: "John Doe",
-    email: "john@cloudstack.io",
+    email: "john@akashone.com",
     role: "super_admin",
     tenantId: "platform-root",
-    tenantName: "CloudStack Platform",
+    tenantName: "AkashOne Platform",
     permissions: {
       manageVMs: true,
       manageNetworks: true,

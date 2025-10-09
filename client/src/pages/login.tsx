@@ -157,7 +157,10 @@ export default function Login() {
             {isLogin ? "Sign In" : "Create Account"}
           </CardTitle>
           <p className="text-sm text-muted-foreground text-center mt-2">
-            CloudStack Management Portal
+            AkashOne.com
+          </p>
+          <p className="text-xs text-muted-foreground text-center">
+            unit of Mieux Technologies Pvt Ltd
           </p>
         </CardHeader>
         <CardContent>

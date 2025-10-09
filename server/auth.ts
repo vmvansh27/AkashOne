@@ -112,7 +112,7 @@ export async function generateTwoFactorSecret(userId: string) {
   }
 
   const secret = authenticator.generateSecret();
-  const otpauthUrl = authenticator.keyuri(user.email, "CloudStack Portal", secret);
+  const otpauthUrl = authenticator.keyuri(user.email, "AkashOne.com", secret);
 
   // Generate QR code
   const qrCodeUrl = await QRCode.toDataURL(otpauthUrl);

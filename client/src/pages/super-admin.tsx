@@ -21,7 +21,7 @@ interface TenantNode {
 
 const mockTenantTree: TenantNode = {
   id: "platform-root",
-  name: "CloudStack Platform",
+  name: "AkashOne Platform",
   type: "platform",
   admins: 5,
   vms: 487,

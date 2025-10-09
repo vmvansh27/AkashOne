@@ -111,8 +111,8 @@ export function AppSidebar() {
             <Server className="h-5 w-5 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">CloudStack</span>
-            <span className="text-xs text-muted-foreground">Management Portal</span>
+            <span className="text-sm font-semibold">AkashOne.com</span>
+            <span className="text-xs text-muted-foreground">Mieux Technologies</span>
           </div>
         </div>
       </SidebarHeader>
@@ -193,7 +193,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <span className="text-sm font-medium truncate">Admin User</span>
-            <span className="text-xs text-muted-foreground truncate">admin@cloudstack.io</span>
+            <span className="text-xs text-muted-foreground truncate">admin@akashone.com</span>
           </div>
         </div>
       </SidebarFooter>

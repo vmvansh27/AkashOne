@@ -1,10 +1,11 @@
-# CloudStack Management Portal - Design Guidelines
+# AkashOne.com - Cloud Management Portal Design Guidelines
 
 ## Design Approach
 
 **Selected Approach:** Modern SaaS Dashboard System
 - **Primary References:** Linear (clean aesthetics), Vercel Dashboard (developer-focused), AWS Console (enterprise patterns)
 - **Rationale:** Cloud infrastructure management requires clarity, efficiency, and trust. We'll combine Linear's minimal aesthetic with enterprise-grade component patterns for a professional yet modern feel.
+- **Brand Identity:** AkashOne.com - unit of Mieux Technologies Pvt Ltd
 
 ## Core Design Elements
 
