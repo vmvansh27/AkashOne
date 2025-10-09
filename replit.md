@@ -20,6 +20,14 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 - VM caching in PostgreSQL for fast queries
 - Form validation to prevent zone/template mismatches
 - Complete ownership verification and multi-tenant security
+- **VM Snapshot/Backup System:**
+  - Create VM snapshots with custom names and descriptions
+  - List all snapshots for each VM
+  - Restore VM to previous snapshot state
+  - Delete snapshots when no longer needed
+  - Full snapshot management UI in VM dialog
+  - CloudStack async job polling for all snapshot operations
+  - Ownership verification on all snapshot operations
 
 #### Kubernetes-as-a-Service (KaaS)
 - One-click Kubernetes cluster deployment with version selection
@@ -71,6 +79,9 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 - **API Routes:**
   - `/api/auth/*` - Authentication endpoints
   - `/api/vms` - Virtual machine management with CloudStack proxy
+  - `/api/vms/:vmId/snapshots` - VM snapshot management (list, create)
+  - `/api/snapshots/:id` - Snapshot operations (delete)
+  - `/api/snapshots/:id/restore` - Restore VM from snapshot
   - `/api/cloudstack/*` - CloudStack metadata (zones, templates, offerings)
   - `/api/kubernetes/clusters` - Kubernetes cluster management
   - `/api/databases` - Database instance management
@@ -78,6 +89,7 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 ### Database Schema
 - **users:** User accounts with 2FA fields
 - **virtual_machines:** VM cache with CloudStack IDs and metadata
+- **vm_snapshots:** VM snapshot records with CloudStack snapshot IDs, names, descriptions, and state tracking
 - **kubernetes_clusters:** K8s cluster configurations and metrics
 - **databases:** Database instance configurations and monitoring
 
