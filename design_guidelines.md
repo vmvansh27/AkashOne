@@ -1,10 +1,11 @@
-# AkashOne.com - Cloud Management Portal Design Guidelines
+# AkashOne.com - Azure-Inspired Cloud Management Portal Design Guidelines
 
 ## Design Approach
 
-**Selected Approach:** Modern SaaS Dashboard System
-- **Primary References:** Linear (clean aesthetics), Vercel Dashboard (developer-focused), AWS Console (enterprise patterns)
-- **Rationale:** Cloud infrastructure management requires clarity, efficiency, and trust. We'll combine Linear's minimal aesthetic with enterprise-grade component patterns for a professional yet modern feel.
+**Selected System:** Microsoft Azure Design Language
+- **Primary Reference:** Azure Portal (enterprise cloud management)
+- **Supporting References:** Fluent Design System, Microsoft 365 Admin Center
+- **Rationale:** CloudStack management demands the same enterprise-grade professionalism as Azure. We'll adopt Microsoft's refined blue palette, Fluent typography, and proven dashboard patterns for immediate familiarity and trust.
 - **Brand Identity:** AkashOne.com - unit of Mieux Technologies Pvt Ltd
 
 ## Core Design Elements
@@ -12,166 +13,174 @@
 ### A. Color Palette
 
 **Dark Mode (Primary):**
-- Background Base: 220 15% 8%
-- Background Elevated: 220 12% 12%
-- Background Subtle: 220 10% 15%
-- Text Primary: 220 10% 95%
-- Text Secondary: 220 8% 65%
-- Text Muted: 220 8% 45%
-- Primary Brand: 213 94% 68% (Blue - trust/tech)
-- Success: 142 76% 45% (Green - running VMs)
-- Warning: 38 92% 58% (Amber - alerts)
-- Error: 0 84% 60% (Red - stopped/failed)
-- Border: 220 10% 20%
+- Background Base: 220 20% 10%
+- Background Elevated: 220 18% 14%
+- Background Hover: 220 16% 18%
+- Text Primary: 0 0% 100%
+- Text Secondary: 210 10% 70%
+- Text Muted: 210 8% 50%
+- Primary Azure: 207 100% 50% (Azure Blue #0078D4)
+- Primary Hover: 207 90% 45%
+- Accent Light: 205 100% 85% (Light Azure accents)
+- Success: 142 70% 45%
+- Warning: 40 95% 55%
+- Error: 0 85% 58%
+- Border: 220 15% 25%
+- Border Subtle: 220 12% 20%
 
 **Light Mode:**
 - Background Base: 0 0% 100%
-- Background Elevated: 220 15% 98%
-- Text Primary: 220 15% 10%
-- Text Secondary: 220 10% 35%
-- Primary Brand: 213 94% 50%
+- Background Elevated: 0 0% 98%
+- Background Hover: 210 20% 96%
+- Text Primary: 210 15% 15%
+- Text Secondary: 210 10% 40%
+- Primary Azure: 207 100% 42%
+- Border: 210 15% 85%
 
 ### B. Typography
 
 **Font Families:**
-- Primary: 'Inter' (Google Fonts) - UI, tables, forms
-- Monospace: 'JetBrains Mono' - code, IPs, resource IDs
+- Primary: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter' fallback (Microsoft standard)
+- Monospace: 'Cascadia Code', 'JetBrains Mono' fallback
 
 **Type Scale:**
-- Display: 2.5rem (40px), font-weight: 700
-- H1: 2rem (32px), font-weight: 600
-- H2: 1.5rem (24px), font-weight: 600
-- H3: 1.25rem (20px), font-weight: 600
-- Body: 0.875rem (14px), font-weight: 400
-- Small: 0.75rem (12px), font-weight: 400
-- Mono: 0.8125rem (13px), font-weight: 400
+- Page Title: 2rem (32px), weight: 600, tracking: -0.02em
+- Section Header: 1.5rem (24px), weight: 600
+- Card Title: 1.125rem (18px), weight: 600
+- Body: 0.875rem (14px), weight: 400
+- Small: 0.75rem (12px), weight: 400
+- Data/Mono: 0.8125rem (13px), weight: 400
 
 ### C. Layout System
 
-**Spacing Units:** Use Tailwind spacing primitives of 1, 2, 4, 6, 8, 12, 16, 24
-- Component padding: p-4, p-6
-- Section gaps: gap-6, gap-8
-- Page margins: px-6, py-8
-- Card spacing: p-6
+**Spacing Primitives:** 2, 3, 4, 6, 8, 12, 16, 20, 24
+- Card padding: p-6
+- Section spacing: gap-8, py-12
+- Component gaps: gap-4, gap-6
 - Table cells: px-4 py-3
+- Form elements: gap-3
 
-**Grid System:**
-- Sidebar: 240px fixed width
-- Main content: flex-1 with max-w-7xl
-- Dashboard cards: grid-cols-1 md:grid-cols-2 lg:grid-cols-4
-- Resource lists: Single column with full-width tables
+**Grid Containers:**
+- Sidebar: 260px fixed, collapsible to 60px (icon-only)
+- Content: max-w-[1600px] mx-auto px-8
+- Dashboard metrics: grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6
+- Resource cards: grid-cols-1 xl:grid-cols-2 gap-6
 
 ### D. Component Library
 
-**Navigation:**
-- Top bar: Fixed height (h-16), dark background with logo, search, user menu
-- Sidebar: Fixed left, collapsible on mobile, grouped nav items with icons (Heroicons)
-- Breadcrumbs: Text-sm with chevron separators
+**Navigation Architecture:**
+- **Command Bar:** Fixed top (h-12), Azure blue background, white text, breadcrumb navigation, search, notifications, user avatar
+- **Left Sidebar:** Dark elevated background, grouped sections with expanders, Heroicons (24px), active state with vertical Azure accent bar (4px left border)
+- **Page Header:** Background elevated, p-6 pb-4, includes page title, description, primary action button
 
 **Dashboard Cards:**
-- Metric Cards: Background elevated, rounded-lg, p-6, border
-- Components: Large number (text-3xl font-bold), label (text-sm text-muted), trend indicator
-- Grid layout: 4 columns on desktop (VMs Running, CPU Usage, Memory, Storage)
+- **Metric Cards:** Elevated background, rounded-lg, p-6, subtle border, hover effect (lift shadow)
+  - Large metric: text-4xl font-semibold in Azure blue
+  - Label: text-sm text-secondary uppercase tracking-wide
+  - Trend: Small sparkline chart (Chart.js) or arrow indicator with percentage
+  - Grid: 4 columns (Total VMs, Running Instances, Total vCPUs, Memory Used)
 
-**Data Tables:**
-- Header: Background subtle, sticky, font-weight: 600, text-sm
-- Rows: Hover background, border-b, alternating subtle backgrounds
-- Actions: Icon buttons at row end, dropdown menus for bulk actions
-- Pagination: Bottom-right, showing "1-10 of 234"
-- Filters: Top-left with search, status dropdowns, date ranges
+**Data Tables (Azure Pattern):**
+- **Header Row:** Background hover, border-b-2 border-Azure, text-xs font-semibold uppercase tracking-wider
+- **Data Rows:** Border-b border-subtle, hover background-hover, 48px min-height
+- **Columns:** Checkbox (40px), Status indicator (dot + text), Name (bold), Technical details (mono font), Actions (right-aligned)
+- **Toolbar:** Top section with search bar (w-80), filter chips, action buttons, bulk operations when selected
+- **Pagination:** Bottom bar with "1-50 of 234 items", page size selector, prev/next buttons
 
-**Forms:**
-- Input Fields: Background elevated, border, rounded-md, h-10, px-3
-- Labels: text-sm font-medium mb-1.5
-- VM Creation Wizard: Multi-step with progress indicator at top
-- Dropdowns: Custom styled with Heroicons chevron-down
-- Validation: Inline error messages in error color
+**Forms & Inputs:**
+- **Text Inputs:** Background elevated, border-2 border, rounded-md, h-10, px-3, focus:border-Azure focus:ring-2 ring-Azure/20
+- **Dropdowns:** Azure Fluent style with chevron, max-height for scroll
+- **VM Creation Wizard:** Stepped progression (5 steps: Basics, Size, Disks, Networking, Review), Azure blue progress bar, step numbers in circles
+- **Toggle Switches:** Fluent design pill style, Azure blue when active
+- **Validation:** Inline below field, error color with error icon
 
-**Status Indicators:**
-- Running: Green dot + text
-- Stopped: Gray dot + text
-- Error: Red dot + text
-- Loading: Animated pulse
+**Status & Badges:**
+- **Running:** Green dot (h-2 w-2 rounded-full), text in success color
+- **Stopped:** Gray dot, muted text
+- **Failed:** Red dot, error text
+- **Starting/Stopping:** Animated pulse dot, Azure text
+- **Badge Style:** px-2.5 py-0.5 rounded-full text-xs font-medium
 
-**Action Buttons:**
-- Primary: Background primary brand, rounded-md, px-4 py-2, font-medium
-- Secondary: Border with outline variant, background transparent
-- Destructive: Error color background for delete actions
-- Icon-only: p-2 with Heroicons, hover background subtle
+**Buttons (Azure Fluent):**
+- **Primary:** bg-Azure text-white rounded px-4 py-2 font-medium hover:bg-Azure-hover, min-w-24
+- **Secondary:** border-2 border-Azure text-Azure bg-transparent, hover:bg-Azure/5
+- **Danger:** bg-error text-white for destructive actions
+- **Icon Buttons:** p-2 rounded hover:bg-hover with Heroicons
 
-**Modals/Dialogs:**
-- Overlay: Background black with 50% opacity
-- Container: max-w-2xl, background elevated, rounded-lg, shadow-2xl
-- Header: p-6 border-b
-- Actions: Bottom-right, gap-3
+**Panels & Modals:**
+- **Side Panel (Details):** Slides from right, w-[640px], elevated background, shadow-2xl
+- **Modal:** Centered, max-w-3xl, rounded-lg, shadow-2xl, backdrop blur
+- **Header:** Azure blue accent bar (h-1) at top, p-6 pb-4
+- **Footer:** p-6 pt-4 border-t, actions right-aligned
 
-**Charts & Graphs:**
-- Use Chart.js or Recharts for resource monitoring
-- Line charts: CPU/Memory over time
-- Donut charts: Storage distribution
-- Color scheme: Match palette (primary for main metrics)
+**Charts & Monitoring:**
+- **Line Charts:** Azure blue primary line, light blue fill gradient, Chart.js
+- **Donut Charts:** Multi-color segments with Azure dominant
+- **Metric Tiles:** Current value large, mini historical sparkline below
+- **Time Range Selector:** Pills for 1h, 6h, 24h, 7d, 30d
 
-### E. Key Screens Structure
+### E. Key Screen Structures
 
-**Dashboard (Home):**
-- Top metrics row: 4 cards (VMs, CPU, Memory, Storage)
-- Recent activity feed: 2-column layout (activity list + resource alerts)
-- Quick actions: "Create VM", "Manage Networks", "View Billing"
+**Dashboard:**
+- **Command Bar** with "Overview" breadcrumb
+- **Quick Actions Row:** 3 large cards (Create VM, Deploy from Template, Network Setup) with icons, hover lift
+- **Metrics Grid:** 4 metric cards with real-time data
+- **Recent Resources:** Table showing 10 most recent VMs with quick actions
+- **Alerts Panel:** Right sidebar (360px) with warning/error notifications, expandable
 
 **VM Management:**
-- Header with "Create VM" button
-- Filters bar: Search, status, template, zone
-- Table: Checkbox, Name, State, IP, Template, CPU/RAM, Actions
-- Bulk actions toolbar when rows selected
+- **Page Header:** "Virtual Machines" title, "Create VM" primary button, "Refresh" secondary
+- **Filters Bar:** Search input (icon left), Status dropdown, Zone selector, Template filter, "Clear all" link
+- **Data Table:** Columns - Checkbox, Status, Name, Public IP (mono), Template, Size, Zone, Actions (3-dot menu)
+- **Selected Actions Bar:** Appears when items checked, bulk Start/Stop/Delete
 
-**VM Details Page:**
-- Header: VM name, state badge, action buttons (Start/Stop/Restart/Delete)
-- Tabs: Overview, Metrics, Networking, Storage, Snapshots, Console
-- Overview: 2-column grid (Specs + Network Info)
-- Metrics: Real-time charts for CPU, Memory, Disk I/O, Network
+**VM Details:**
+- **Header:** VM name (h1), status badge, action buttons row (Start/Stop/Restart/Console/Delete)
+- **Tab Navigation:** Overview, Monitoring, Networking, Storage, Snapshots, Settings (Azure tab style with bottom border on active)
+- **Overview Tab:** 2-column layout - Left: Specs card, Right: Network & Security card
+- **Monitoring Tab:** Time range selector top-right, 2x2 grid of charts (CPU, Memory, Disk I/O, Network)
 
-**Resource Monitoring:**
-- Grid of metric cards with sparkline charts
-- Filterable by zone, host, time range
-- Alert table below metrics
+**Create VM Wizard:**
+- **Progress Header:** 5 steps with connected line, current step in Azure blue
+- **Step Content:** Max-w-2xl centered, form fields with descriptions
+- **Navigation:** Previous/Next buttons bottom-right, "Review + create" on final step
+- **Review Step:** Summary cards grouped by category, "Create" primary button
 
-**Network Management:**
-- VPC list with expand/collapse for details
-- Firewall rules table
-- Public IP assignment interface
-
-**Billing Section:**
-- Usage summary cards
-- Detailed invoice table
-- Cost breakdown charts
+**Billing Dashboard:**
+- **Current Cost Card:** Large number with month-to-date label, trend vs last month
+- **Cost Breakdown:** Donut chart with legend showing VM instances, storage, network, snapshots
+- **Invoice Table:** Sortable by date, amount, status with download PDF action
 
 ### Images
 
-**Hero/Empty States Only:**
-- Dashboard empty state: Subtle illustration of cloud infrastructure (abstract servers/networks)
-- No VMs state: Friendly illustration with "Create your first VM" prompt
-- Empty network view: Network topology illustration
-- No hero images - this is a utility application
+**Strategic Placement:**
+- **Dashboard Empty State:** Abstract cloud infrastructure illustration (servers, network topology) in Azure blue/gray tones, centered with "No resources yet" message
+- **VM List Empty:** Cloud server icon illustration with "Create your first virtual machine" CTA
+- **Network Empty State:** Minimalist network diagram illustration
 
-**Icons:**
-- Use Heroicons exclusively via CDN
-- Consistent 20px size for inline icons
-- 24px for action buttons
+**NO hero images** - this is a utility dashboard application. Focus on data density and functional clarity.
+
+### Icons & Assets
+
+- **Icon Library:** Heroicons via CDN exclusively
+- **Sizes:** 20px inline, 24px buttons, 48px empty states
+- **Style:** Outline variant for navigation, solid for status indicators
 
 ### Animations
 
-**Minimal & Purposeful:**
-- Loading spinners: Simple rotation
-- Table row hover: Subtle background transition (150ms)
-- Modal entry: Fade + scale (200ms ease-out)
-- NO scroll animations, parallax, or decorative motion
+**Minimal Motion:**
+- Table hover: background transition (100ms)
+- Button hover: subtle lift (150ms)
+- Modal/panel entry: fade + slide (250ms ease-out)
+- Loading states: Azure blue spinner animation
+- **NO** scroll effects or decorative animations
 
 ### Accessibility
 
-- All interactive elements: min height 44px (touch target)
-- Focus rings: 2px ring with primary color
-- Tables: Proper thead/tbody/th structure
-- Forms: Label association, aria-labels
-- Consistent dark mode across all inputs/selects
+- Focus rings: 2px ring-Azure ring-offset-2
+- Min touch target: 44px
+- Table semantic structure: proper thead/tbody
+- Form labels: associated with inputs, aria-labels for icon buttons
+- Dark mode consistency: all inputs maintain elevated background
 
-This design creates a professional, efficient cloud management interface that prioritizes clarity and usability over visual flair, while maintaining a modern, polished aesthetic.
+This design creates an enterprise-grade cloud management interface with Microsoft Azure's proven visual language, prioritizing professional clarity and operational efficiency.
