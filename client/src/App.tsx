@@ -21,6 +21,7 @@ import AdminRights from "@/pages/admin-rights";
 import AllVMs from "@/pages/all-vms";
 import AllKubernetes from "@/pages/all-kubernetes";
 import SecuritySettings from "@/pages/security-settings";
+import FeatureManagement from "@/pages/feature-management";
 import Kubernetes from "@/pages/kubernetes";
 import Database from "@/pages/database";
 import Marketplace from "@/pages/marketplace";
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/whitelabel" component={WhiteLabel} />
       <Route path="/customers" component={ResellerCustomers} />
       <Route path="/super-admin" component={SuperAdmin} />
+      <Route path="/feature-management" component={FeatureManagement} />
       <Route path="/admin-rights" component={AdminRights} />
       <Route path="/all-vms" component={AllVMs} />
       <Route path="/all-kubernetes" component={AllKubernetes} />

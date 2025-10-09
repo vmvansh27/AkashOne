@@ -109,6 +109,11 @@ const superAdminItems = [
     icon: Crown,
   },
   {
+    title: "Feature Management",
+    url: "/feature-management",
+    icon: Settings,
+  },
+  {
     title: "Admin Rights",
     url: "/admin-rights",
     icon: UserCheck,
