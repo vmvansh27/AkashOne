@@ -970,6 +970,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===================================
+  // Feature Flags Management
+  // ===================================
+
+  // Get all feature flags
+  app.get("/api/feature-flags", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const flags = await storage.getFeatureFlags();
+      res.json(flags);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get feature flag by key
+  app.get("/api/feature-flags/key/:key", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const flag = await storage.getFeatureFlagByKey(req.params.key);
+      if (!flag) {
+        return res.status(404).json({ message: "Feature flag not found" });
+      }
+
+      res.json(flag);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update feature flag (toggle enabled/disabled)
+  app.patch("/api/feature-flags/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // TODO: Add super admin role check here
+      // For now, any authenticated user can toggle features (update this when RBAC is implemented)
+
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "Invalid request: enabled must be boolean" });
+      }
+
+      const updatedFlag = await storage.updateFeatureFlag(req.params.id, { enabled });
+      if (!updatedFlag) {
+        return res.status(404).json({ message: "Feature flag not found" });
+      }
+
+      res.json(updatedFlag);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

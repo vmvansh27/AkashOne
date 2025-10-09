@@ -450,8 +450,14 @@ export class MemStorage implements IStorage {
   async createVMSnapshot(snapshot: InsertVMSnapshot): Promise<VMSnapshot> {
     const id = randomUUID();
     const newSnapshot: VMSnapshot = {
-      ...snapshot,
       id,
+      cloudstackSnapshotId: snapshot.cloudstackSnapshotId,
+      vmId: snapshot.vmId,
+      userId: snapshot.userId,
+      name: snapshot.name,
+      description: snapshot.description ?? null,
+      state: snapshot.state,
+      snapshotMemory: snapshot.snapshotMemory ?? null,
       createdAt: new Date(),
     };
     this.vmSnapshots.set(id, newSnapshot);
@@ -478,8 +484,14 @@ export class MemStorage implements IStorage {
   async createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag> {
     const id = randomUUID();
     const newFlag: FeatureFlag = {
-      ...flag,
       id,
+      key: flag.key,
+      name: flag.name,
+      description: flag.description ?? null,
+      category: flag.category,
+      enabled: flag.enabled ?? false,
+      icon: flag.icon ?? null,
+      sortOrder: flag.sortOrder ?? 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
