@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   accountType: text("account_type").notNull().default("customer"), // super_admin, reseller, customer, team_member
   organizationId: varchar("organization_id"), // References the parent organization/reseller
+  defaultDiscountPercentage: integer("default_discount_percentage").default(0), // Permanent discount % assigned by super admin (0-100)
   status: text("status").notNull().default("active"), // active, suspended, invited
   createdAt: timestamp("created_at").defaultNow(),
   lastLogin: timestamp("last_login"),
@@ -112,6 +113,25 @@ export const virtualMachines = pgTable("virtual_machines", {
   userId: varchar("user_id").references(() => users.id),
 });
 
+export const discountCoupons = pgTable("discount_coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  discountType: text("discount_type").notNull(), // "percentage" or "fixed"
+  discountValue: integer("discount_value").notNull(), // percentage (1-100) or amount in INR
+  durationType: text("duration_type").notNull(), // "once", "forever", "repeating"
+  durationMonths: integer("duration_months"), // for "repeating" type
+  maxUses: integer("max_uses"), // null = unlimited
+  timesUsed: integer("times_used").notNull().default(0),
+  minOrderAmount: integer("min_order_amount"), // minimum order amount in INR (paise)
+  validFrom: timestamp("valid_from").defaultNow(),
+  validUntil: timestamp("valid_until"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
@@ -161,6 +181,18 @@ export const insertVirtualMachineSchema = createInsertSchema(virtualMachines).om
   userId: true,
 });
 
+export const insertDiscountCouponSchema = createInsertSchema(discountCoupons).omit({
+  id: true,
+  createdAt: true,
+  timesUsed: true,
+  createdBy: true,
+}).extend({
+  code: z.string().min(3).max(50).toUpperCase(),
+  discountType: z.enum(["percentage", "fixed"]),
+  discountValue: z.number().int().positive(),
+  durationType: z.enum(["once", "forever", "repeating"]),
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type KubernetesCluster = typeof kubernetesClusters.$inferSelect;
@@ -173,6 +205,8 @@ export type DnsRecord = typeof dnsRecords.$inferSelect;
 export type InsertDnsRecord = z.infer<typeof insertDnsRecordSchema>;
 export type VirtualMachine = typeof virtualMachines.$inferSelect;
 export type InsertVirtualMachine = z.infer<typeof insertVirtualMachineSchema>;
+export type DiscountCoupon = typeof discountCoupons.$inferSelect;
+export type InsertDiscountCoupon = z.infer<typeof insertDiscountCouponSchema>;
 
 export const vmSnapshots = pgTable("vm_snapshots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

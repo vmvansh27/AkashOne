@@ -45,6 +45,10 @@ export async function registerUser(
     email,
     password: hashedPassword,
     gstNumber,
+  });
+
+  // Update user with verification code
+  await storage.updateUser(user.id, {
     emailVerificationCode: verificationCode,
     emailVerificationExpiry: verificationExpiry,
     emailVerified: false,

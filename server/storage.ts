@@ -25,6 +25,8 @@ import {
   type InsertUserRole,
   type TeamMember,
   type InsertTeamMember,
+  type DiscountCoupon,
+  type InsertDiscountCoupon,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -126,6 +128,16 @@ export interface IStorage {
   userHasPermission(userId: string, permissionKey: string): Promise<boolean>;
   initializeDefaultPermissions(): Promise<void>;
   initializeDefaultRoles(): Promise<void>;
+
+  // Discount Coupons
+  getDiscountCoupons(): Promise<DiscountCoupon[]>;
+  getDiscountCoupon(id: string): Promise<DiscountCoupon | undefined>;
+  getDiscountCouponByCode(code: string): Promise<DiscountCoupon | undefined>;
+  createDiscountCoupon(coupon: InsertDiscountCoupon & { createdBy: string }): Promise<DiscountCoupon>;
+  updateDiscountCoupon(id: string, data: Partial<DiscountCoupon>): Promise<DiscountCoupon | undefined>;
+  deleteDiscountCoupon(id: string): Promise<boolean>;
+  incrementCouponUsage(id: string): Promise<void>;
+  validateCoupon(code: string, orderAmount?: number): Promise<{ valid: boolean; error?: string; coupon?: DiscountCoupon }>;
 }
 
 export class MemStorage implements IStorage {
@@ -142,6 +154,7 @@ export class MemStorage implements IStorage {
   private rolePermissions: Map<string, RolePermission>;
   private userRoles: Map<string, UserRole>;
   private teamMembers: Map<string, TeamMember>;
+  private discountCoupons: Map<string, DiscountCoupon>;
 
   constructor() {
     this.users = new Map();
@@ -157,6 +170,7 @@ export class MemStorage implements IStorage {
     this.rolePermissions = new Map();
     this.userRoles = new Map();
     this.teamMembers = new Map();
+    this.discountCoupons = new Map();
     
     // Initialize defaults
     this.initializeDefaultFeatureFlags();
@@ -1031,6 +1045,106 @@ export class MemStorage implements IStorage {
         }
       }
     }
+  }
+
+  // Discount Coupons Implementation
+  async getDiscountCoupons(): Promise<DiscountCoupon[]> {
+    return Array.from(this.discountCoupons.values());
+  }
+
+  async getDiscountCoupon(id: string): Promise<DiscountCoupon | undefined> {
+    return this.discountCoupons.get(id);
+  }
+
+  async getDiscountCouponByCode(code: string): Promise<DiscountCoupon | undefined> {
+    return Array.from(this.discountCoupons.values()).find(
+      (coupon) => coupon.code.toUpperCase() === code.toUpperCase()
+    );
+  }
+
+  async createDiscountCoupon(insertCoupon: InsertDiscountCoupon & { createdBy: string }): Promise<DiscountCoupon> {
+    const id = randomUUID();
+    const coupon: DiscountCoupon = {
+      ...insertCoupon,
+      id,
+      code: insertCoupon.code.toUpperCase(),
+      timesUsed: 0,
+      validFrom: insertCoupon.validFrom || new Date(),
+      validUntil: insertCoupon.validUntil || null,
+      isActive: insertCoupon.isActive !== undefined ? insertCoupon.isActive : true,
+      createdAt: new Date(),
+      createdBy: insertCoupon.createdBy,
+      description: insertCoupon.description || null,
+      durationMonths: insertCoupon.durationMonths || null,
+      maxUses: insertCoupon.maxUses || null,
+      minOrderAmount: insertCoupon.minOrderAmount || null,
+    };
+
+    this.discountCoupons.set(id, coupon);
+    return coupon;
+  }
+
+  async updateDiscountCoupon(id: string, data: Partial<DiscountCoupon>): Promise<DiscountCoupon | undefined> {
+    const coupon = this.discountCoupons.get(id);
+    if (!coupon) {
+      return undefined;
+    }
+
+    const updated = { ...coupon, ...data };
+    if (data.code) {
+      updated.code = data.code.toUpperCase();
+    }
+    this.discountCoupons.set(id, updated);
+    return updated;
+  }
+
+  async deleteDiscountCoupon(id: string): Promise<boolean> {
+    return this.discountCoupons.delete(id);
+  }
+
+  async incrementCouponUsage(id: string): Promise<void> {
+    const coupon = this.discountCoupons.get(id);
+    if (coupon) {
+      coupon.timesUsed += 1;
+      this.discountCoupons.set(id, coupon);
+    }
+  }
+
+  async validateCoupon(
+    code: string,
+    orderAmount?: number
+  ): Promise<{ valid: boolean; error?: string; coupon?: DiscountCoupon }> {
+    const coupon = await this.getDiscountCouponByCode(code);
+
+    if (!coupon) {
+      return { valid: false, error: "Coupon not found" };
+    }
+
+    if (!coupon.isActive) {
+      return { valid: false, error: "Coupon is inactive" };
+    }
+
+    const now = new Date();
+    if (coupon.validFrom && new Date(coupon.validFrom) > now) {
+      return { valid: false, error: "Coupon is not yet valid" };
+    }
+
+    if (coupon.validUntil && new Date(coupon.validUntil) < now) {
+      return { valid: false, error: "Coupon has expired" };
+    }
+
+    if (coupon.maxUses && coupon.timesUsed >= coupon.maxUses) {
+      return { valid: false, error: "Coupon usage limit reached" };
+    }
+
+    if (coupon.minOrderAmount && orderAmount && orderAmount < coupon.minOrderAmount) {
+      return {
+        valid: false,
+        error: `Minimum order amount of ₹${coupon.minOrderAmount / 100} required`,
+      };
+    }
+
+    return { valid: true, coupon };
   }
 }
 

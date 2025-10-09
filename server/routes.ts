@@ -12,6 +12,7 @@ import {
   disableTwoFactor,
 } from "./auth";
 import { createFeatureFlagMiddleware } from "./middleware/feature-flags";
+import { insertDiscountCouponSchema } from "@shared/schema";
 
 declare module "express-session" {
   interface SessionData {
@@ -1474,6 +1475,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(Array.from(allPermissions));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Discount Coupons Management
+  app.get("/api/coupons", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const coupons = await storage.getDiscountCoupons();
+      res.json(coupons);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/coupons/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const coupon = await storage.getDiscountCoupon(req.params.id);
+      if (!coupon) {
+        return res.status(404).json({ message: "Coupon not found" });
+      }
+      res.json(coupon);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/coupons/validate", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { code, orderAmount } = req.body;
+      const result = await storage.validateCoupon(code, orderAmount);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/coupons", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertDiscountCouponSchema.parse(req.body);
+      const coupon = await storage.createDiscountCoupon({
+        ...validatedData,
+        createdBy: req.session.userId,
+      });
+      res.status(201).json(coupon);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Invalid coupon data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/coupons/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const coupon = await storage.updateDiscountCoupon(req.params.id, req.body);
+      if (!coupon) {
+        return res.status(404).json({ message: "Coupon not found" });
+      }
+      res.json(coupon);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/coupons/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const deleted = await storage.deleteDiscountCoupon(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Coupon not found" });
+      }
+      res.json({ message: "Coupon deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update user discount percentage (Super Admin only)
+  app.patch("/api/users/:id/discount", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.accountType !== "super_admin") {
+        return res.status(403).json({ message: "Only super admins can set discount percentages" });
+      }
+
+      const { discountPercentage } = req.body;
+      
+      if (typeof discountPercentage !== "number" || discountPercentage < 0 || discountPercentage > 100) {
+        return res.status(400).json({ message: "Discount percentage must be between 0 and 100" });
+      }
+
+      const user = await storage.updateUser(req.params.id, {
+        defaultDiscountPercentage: discountPercentage,
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ message: "Discount percentage updated successfully", user });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
