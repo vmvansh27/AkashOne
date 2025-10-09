@@ -13,6 +13,8 @@ import {
   type InsertVirtualMachine,
   type VMSnapshot,
   type InsertVMSnapshot,
+  type FeatureFlag,
+  type InsertFeatureFlag,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -68,6 +70,15 @@ export interface IStorage {
   getVMSnapshotByCloudstackId(cloudstackSnapshotId: string): Promise<VMSnapshot | undefined>;
   createVMSnapshot(snapshot: InsertVMSnapshot): Promise<VMSnapshot>;
   deleteVMSnapshot(id: string): Promise<boolean>;
+
+  // Feature Flags
+  getFeatureFlags(): Promise<FeatureFlag[]>;
+  getFeatureFlag(id: string): Promise<FeatureFlag | undefined>;
+  getFeatureFlagByKey(key: string): Promise<FeatureFlag | undefined>;
+  createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag>;
+  updateFeatureFlag(id: string, data: Partial<FeatureFlag>): Promise<FeatureFlag | undefined>;
+  deleteFeatureFlag(id: string): Promise<boolean>;
+  initializeDefaultFeatureFlags(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -78,6 +89,7 @@ export class MemStorage implements IStorage {
   private dnsRecords: Map<string, DnsRecord>;
   private virtualMachines: Map<string, VirtualMachine>;
   private vmSnapshots: Map<string, VMSnapshot>;
+  private featureFlags: Map<string, FeatureFlag>;
 
   constructor() {
     this.users = new Map();
@@ -87,6 +99,10 @@ export class MemStorage implements IStorage {
     this.dnsRecords = new Map();
     this.virtualMachines = new Map();
     this.vmSnapshots = new Map();
+    this.featureFlags = new Map();
+    
+    // Initialize default feature flags
+    this.initializeDefaultFeatureFlags();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -444,6 +460,175 @@ export class MemStorage implements IStorage {
 
   async deleteVMSnapshot(id: string): Promise<boolean> {
     return this.vmSnapshots.delete(id);
+  }
+
+  // Feature Flags
+  async getFeatureFlags(): Promise<FeatureFlag[]> {
+    return Array.from(this.featureFlags.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async getFeatureFlag(id: string): Promise<FeatureFlag | undefined> {
+    return this.featureFlags.get(id);
+  }
+
+  async getFeatureFlagByKey(key: string): Promise<FeatureFlag | undefined> {
+    return Array.from(this.featureFlags.values()).find((flag) => flag.key === key);
+  }
+
+  async createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag> {
+    const id = randomUUID();
+    const newFlag: FeatureFlag = {
+      ...flag,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.featureFlags.set(id, newFlag);
+    return newFlag;
+  }
+
+  async updateFeatureFlag(id: string, data: Partial<FeatureFlag>): Promise<FeatureFlag | undefined> {
+    const flag = this.featureFlags.get(id);
+    if (!flag) return undefined;
+    const updatedFlag = { ...flag, ...data, updatedAt: new Date() };
+    this.featureFlags.set(id, updatedFlag);
+    return updatedFlag;
+  }
+
+  async deleteFeatureFlag(id: string): Promise<boolean> {
+    return this.featureFlags.delete(id);
+  }
+
+  async initializeDefaultFeatureFlags(): Promise<void> {
+    const defaultFlags: InsertFeatureFlag[] = [
+      // Core Services (Already enabled)
+      {
+        key: "virtual_machines",
+        name: "Virtual Machines",
+        description: "VM provisioning and management with CloudStack integration",
+        category: "Compute",
+        enabled: true,
+        icon: "Server",
+        sortOrder: 1,
+      },
+      {
+        key: "kubernetes",
+        name: "Kubernetes Service",
+        description: "Managed Kubernetes clusters with auto-scaling",
+        category: "Compute",
+        enabled: true,
+        icon: "Container",
+        sortOrder: 2,
+      },
+      {
+        key: "database",
+        name: "Database-as-a-Service",
+        description: "Managed database instances (MySQL, PostgreSQL, MongoDB, Redis)",
+        category: "Compute",
+        enabled: true,
+        icon: "Database",
+        sortOrder: 3,
+      },
+      {
+        key: "dns",
+        name: "DNS Management",
+        description: "Domain and DNS record management",
+        category: "Networking",
+        enabled: true,
+        icon: "Globe",
+        sortOrder: 4,
+      },
+      {
+        key: "object_storage",
+        name: "Object Storage",
+        description: "S3-compatible object storage service",
+        category: "Storage",
+        enabled: true,
+        icon: "HardDrive",
+        sortOrder: 5,
+      },
+      {
+        key: "billing",
+        name: "Billing & Invoices",
+        description: "Indian GST-compliant billing system",
+        category: "Billing",
+        enabled: true,
+        icon: "Receipt",
+        sortOrder: 6,
+      },
+
+      // New Features (Initially disabled)
+      {
+        key: "payment_gateway",
+        name: "Payment Gateway Configuration",
+        description: "Configure Stripe, Razorpay, PayPal payment integrations",
+        category: "Billing",
+        enabled: false,
+        icon: "CreditCard",
+        sortOrder: 10,
+      },
+      {
+        key: "pricing_calculator",
+        name: "Pricing Calculator",
+        description: "Interactive cost estimation tool for resources",
+        category: "Billing",
+        enabled: false,
+        icon: "Calculator",
+        sortOrder: 11,
+      },
+      {
+        key: "load_balancer",
+        name: "Load Balancer Service",
+        description: "Request distribution and high-availability load balancing",
+        category: "Networking",
+        enabled: false,
+        icon: "Network",
+        sortOrder: 12,
+      },
+      {
+        key: "gpu_instances",
+        name: "GPU Instances",
+        description: "NVIDIA GPU compute instances for AI/ML workloads",
+        category: "Compute",
+        enabled: false,
+        icon: "Zap",
+        sortOrder: 13,
+      },
+      {
+        key: "ssl_certificates",
+        name: "SSL Certificate Manager",
+        description: "Automated SSL certificate provisioning and management",
+        category: "Networking",
+        enabled: false,
+        icon: "Shield",
+        sortOrder: 14,
+      },
+      {
+        key: "cdn_service",
+        name: "CDN Service",
+        description: "Content delivery network for global acceleration",
+        category: "Networking",
+        enabled: false,
+        icon: "Cloudy",
+        sortOrder: 15,
+      },
+      {
+        key: "auto_scaling",
+        name: "VM Auto-Scaling Groups",
+        description: "Dynamic resource scaling based on load metrics",
+        category: "Compute",
+        enabled: false,
+        icon: "TrendingUp",
+        sortOrder: 16,
+      },
+    ];
+
+    for (const flag of defaultFlags) {
+      const existing = await this.getFeatureFlagByKey(flag.key);
+      if (!existing) {
+        await this.createFeatureFlag(flag);
+      }
+    }
   }
 }
 
