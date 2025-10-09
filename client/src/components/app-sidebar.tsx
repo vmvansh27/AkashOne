@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Users, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, ShoppingBag, Cloud, Globe } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,8 +12,17 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { FeatureFlag } from "@shared/schema";
 
-const menuItems = [
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: any;
+  featureKey?: string; // Optional feature key for dynamic filtering
+}
+
+const menuItems: MenuItem[] = [
   {
     title: "Dashboard",
     url: "/",
@@ -23,31 +32,31 @@ const menuItems = [
     title: "Virtual Machines",
     url: "/vms",
     icon: Server,
+    featureKey: "virtual_machines",
   },
   {
     title: "Kubernetes",
     url: "/kubernetes",
     icon: Boxes,
+    featureKey: "kubernetes",
   },
   {
     title: "Database",
     url: "/database",
     icon: Database,
-  },
-  {
-    title: "Marketplace",
-    url: "/marketplace",
-    icon: ShoppingBag,
+    featureKey: "database",
   },
   {
     title: "Object Storage",
     url: "/object-storage",
     icon: Cloud,
+    featureKey: "object_storage",
   },
   {
     title: "DNS",
     url: "/dns",
     icon: Globe,
+    featureKey: "dns",
   },
   {
     title: "Networks",
@@ -64,14 +73,66 @@ const menuItems = [
     url: "/monitoring",
     icon: BarChart3,
   },
+];
+
+const billingItems: MenuItem[] = [
   {
     title: "Billing",
     url: "/billing",
     icon: Receipt,
+    featureKey: "billing",
+  },
+  {
+    title: "Payment Gateways",
+    url: "/payment-gateways",
+    icon: CreditCard,
+    featureKey: "payment_gateway",
+  },
+  {
+    title: "Pricing Calculator",
+    url: "/pricing-calculator",
+    icon: Calculator,
+    featureKey: "pricing_calculator",
   },
 ];
 
-const adminItems = [
+const advancedComputeItems: MenuItem[] = [
+  {
+    title: "GPU Instances",
+    url: "/gpu-instances",
+    icon: Zap,
+    featureKey: "gpu_instances",
+  },
+  {
+    title: "Auto-Scaling Groups",
+    url: "/auto-scaling",
+    icon: TrendingUp,
+    featureKey: "vm_autoscaling",
+  },
+];
+
+const networkingItems: MenuItem[] = [
+  {
+    title: "Load Balancer",
+    url: "/load-balancer",
+    icon: Network,
+    featureKey: "load_balancer",
+  },
+  {
+    title: "SSL Certificates",
+    url: "/ssl-certificates",
+    icon: Shield,
+    featureKey: "ssl_certificates",
+  },
+  {
+    title: "CDN Service",
+    url: "/cdn",
+    icon: Cloudy,
+    featureKey: "cdn_service",
+  },
+];
+
+const adminItems: MenuItem[] = [
   {
     title: "Security",
     url: "/security",
@@ -84,7 +145,7 @@ const adminItems = [
   },
 ];
 
-const resellerItems = [
+const resellerItems: MenuItem[] = [
   {
     title: "Resellers",
     url: "/resellers",
@@ -102,7 +163,7 @@ const resellerItems = [
   },
 ];
 
-const superAdminItems = [
+const superAdminItems: MenuItem[] = [
   {
     title: "Super Admin",
     url: "/super-admin",
@@ -133,6 +194,32 @@ const superAdminItems = [
 export function AppSidebar() {
   const [location] = useLocation();
 
+  // Fetch feature flags
+  const { data: features = [] } = useQuery<FeatureFlag[]>({
+    queryKey: ["/api/feature-flags"],
+  });
+
+  // Create a map of feature keys to enabled status
+  const featureMap = new Map<string, boolean>();
+  features.forEach((feature) => {
+    featureMap.set(feature.key, feature.enabled);
+  });
+
+  // Filter function for menu items based on feature flags
+  const filterByFeature = (items: MenuItem[]) => {
+    return items.filter((item) => {
+      // If no feature key, always show
+      if (!item.featureKey) return true;
+      // Show if feature is enabled (default to false if not found)
+      return featureMap.get(item.featureKey) === true;
+    });
+  };
+
+  const visibleMenuItems = filterByFeature(menuItems);
+  const visibleBillingItems = filterByFeature(billingItems);
+  const visibleAdvancedComputeItems = filterByFeature(advancedComputeItems);
+  const visibleNetworkingItems = filterByFeature(networkingItems);
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
@@ -151,10 +238,10 @@ export function AppSidebar() {
           <SidebarGroupLabel>Resources</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-')}`}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -164,6 +251,67 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {visibleAdvancedComputeItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Advanced Compute</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleAdvancedComputeItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url}>
+                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {visibleNetworkingItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Networking</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleNetworkingItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url}>
+                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {visibleBillingItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Billing & Pricing</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleBillingItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url}>
+                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarGroup>
           <SidebarGroupLabel>Super Admin</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -171,7 +319,7 @@ export function AppSidebar() {
               {superAdminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-')}`}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -188,7 +336,7 @@ export function AppSidebar() {
               {resellerItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-').replace('-', '')}`}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -205,7 +353,7 @@ export function AppSidebar() {
               {adminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase()}`}>
+                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>

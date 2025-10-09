@@ -22,6 +22,13 @@ import AllVMs from "@/pages/all-vms";
 import AllKubernetes from "@/pages/all-kubernetes";
 import SecuritySettings from "@/pages/security-settings";
 import FeatureManagement from "@/pages/feature-management";
+import PaymentGateways from "@/pages/payment-gateways";
+import PricingCalculator from "@/pages/pricing-calculator";
+import LoadBalancer from "@/pages/load-balancer";
+import GPUInstances from "@/pages/gpu-instances";
+import SSLCertificates from "@/pages/ssl-certificates";
+import CDN from "@/pages/cdn";
+import AutoScaling from "@/pages/auto-scaling";
 import Kubernetes from "@/pages/kubernetes";
 import Database from "@/pages/database";
 import Marketplace from "@/pages/marketplace";
@@ -71,6 +78,13 @@ function Router() {
       <Route path="/all-vms" component={AllVMs} />
       <Route path="/all-kubernetes" component={AllKubernetes} />
       <Route path="/security" component={SecuritySettings} />
+      <Route path="/payment-gateways" component={PaymentGateways} />
+      <Route path="/pricing-calculator" component={PricingCalculator} />
+      <Route path="/load-balancer" component={LoadBalancer} />
+      <Route path="/gpu-instances" component={GPUInstances} />
+      <Route path="/ssl-certificates" component={SSLCertificates} />
+      <Route path="/cdn" component={CDN} />
+      <Route path="/auto-scaling" component={AutoScaling} />
       <Route component={NotFound} />
     </Switch>
   );
