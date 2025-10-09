@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,7 @@ import {
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertVirtualMachineSchema, type VirtualMachine } from "@shared/schema";
+import { insertVirtualMachineSchema, type VirtualMachine, type VMSnapshot } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import {
   Search,
@@ -51,6 +52,8 @@ import {
   MemoryStick,
   Network,
   Plus,
+  Camera,
+  History,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -91,7 +94,11 @@ const getStateBadgeVariant = (state: string) => {
 export default function VirtualMachines() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const { toast } = useToast();
+  const [snapshotsDialogOpen, setSnapshotsDialogOpen] = useState(false);
+  const [selectedVM, setSelectedVM] = useState<VirtualMachine | null>(null);
+  const [snapshotName, setSnapshotName] = useState("");
+  const [snapshotDescription, setSnapshotDescription] = useState("");
+  const { toast} = useToast();
 
   // Fetch VMs
   const { data: vms = [], isLoading: vmsLoading } = useQuery<VirtualMachine[]>({
@@ -189,6 +196,63 @@ export default function VirtualMachines() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vms"] });
       toast({ title: "VM Destroyed", description: "Virtual machine has been deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Snapshot queries and mutations
+  const { data: snapshots = [], isLoading: snapshotsLoading } = useQuery<VMSnapshot[]>({
+    queryKey: ["/api/vms", selectedVM?.id, "snapshots"],
+    enabled: snapshotsDialogOpen && !!selectedVM,
+  });
+
+  const createSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedVM) throw new Error("No VM selected");
+      const res = await apiRequest("POST", `/api/vms/${selectedVM.id}/snapshots`, {
+        name: snapshotName,
+        description: snapshotDescription,
+        snapshotMemory: true,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms", selectedVM?.id, "snapshots"] });
+      setSnapshotName("");
+      setSnapshotDescription("");
+      toast({ title: "Snapshot Created", description: "VM snapshot created successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteSnapshotMutation = useMutation({
+    mutationFn: async (snapshotId: string) => {
+      const res = await apiRequest("DELETE", `/api/snapshots/${snapshotId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms", selectedVM?.id, "snapshots"] });
+      toast({ title: "Snapshot Deleted", description: "Snapshot removed successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const restoreSnapshotMutation = useMutation({
+    mutationFn: async (snapshotId: string) => {
+      const res = await apiRequest("POST", `/api/snapshots/${snapshotId}/restore`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vms", selectedVM?.id, "snapshots"] });
+      setSnapshotsDialogOpen(false);
+      toast({ title: "VM Restored", description: "VM restored from snapshot successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -543,6 +607,17 @@ export default function VirtualMachines() {
                           size="sm"
                           variant="ghost"
                           onClick={() => {
+                            setSelectedVM(vm);
+                            setSnapshotsDialogOpen(true);
+                          }}
+                          data-testid={`button-snapshots-${vm.id}`}
+                        >
+                          <Camera className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
                             if (confirm(`Are you sure you want to destroy ${vm.displayName || vm.name}?`)) {
                               destroyVMMutation.mutate(vm.id);
                             }
@@ -561,6 +636,123 @@ export default function VirtualMachines() {
           )}
         </CardContent>
       </Card>
+
+      {/* Snapshots Dialog */}
+      <Dialog open={snapshotsDialogOpen} onOpenChange={setSnapshotsDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>VM Snapshots - {selectedVM?.displayName || selectedVM?.name}</DialogTitle>
+            <DialogDescription>
+              Create and manage snapshots for quick backup and restore
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Create Snapshot Form */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <h3 className="font-medium flex items-center gap-2">
+                <Camera className="h-4 w-4" />
+                Create New Snapshot
+              </h3>
+              <div className="grid gap-3">
+                <div>
+                  <Label htmlFor="snapshot-name">Snapshot Name</Label>
+                  <Input
+                    id="snapshot-name"
+                    value={snapshotName}
+                    onChange={(e) => setSnapshotName(e.target.value)}
+                    placeholder="e.g., before-update-2025"
+                    data-testid="input-snapshot-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="snapshot-description">Description (optional)</Label>
+                  <Input
+                    id="snapshot-description"
+                    value={snapshotDescription}
+                    onChange={(e) => setSnapshotDescription(e.target.value)}
+                    placeholder="e.g., Snapshot before system update"
+                    data-testid="input-snapshot-description"
+                  />
+                </div>
+                <Button
+                  onClick={() => createSnapshotMutation.mutate()}
+                  disabled={!snapshotName || createSnapshotMutation.isPending}
+                  data-testid="button-create-snapshot"
+                >
+                  {createSnapshotMutation.isPending ? "Creating..." : "Create Snapshot"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Existing Snapshots */}
+            <div>
+              <h3 className="font-medium mb-3">Existing Snapshots</h3>
+              {snapshotsLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading snapshots...</div>
+              ) : snapshots.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No snapshots yet. Create your first snapshot above.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>State</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {snapshots.map((snapshot) => (
+                      <TableRow key={snapshot.id} data-testid={`row-snapshot-${snapshot.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-snapshot-name-${snapshot.id}`}>
+                          {snapshot.name}
+                        </TableCell>
+                        <TableCell data-testid={`text-snapshot-description-${snapshot.id}`}>
+                          {snapshot.description || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" data-testid={`badge-snapshot-state-${snapshot.id}`}>
+                            {snapshot.state}
+                          </Badge>
+                        </TableCell>
+                        <TableCell data-testid={`text-snapshot-created-${snapshot.id}`}>
+                          {new Date(snapshot.createdAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => restoreSnapshotMutation.mutate(snapshot.id)}
+                              disabled={restoreSnapshotMutation.isPending}
+                              data-testid={`button-restore-${snapshot.id}`}
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => deleteSnapshotMutation.mutate(snapshot.id)}
+                              disabled={deleteSnapshotMutation.isPending}
+                              data-testid={`button-delete-snapshot-${snapshot.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
