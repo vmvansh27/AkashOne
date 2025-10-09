@@ -15,6 +15,16 @@ import {
   type InsertVMSnapshot,
   type FeatureFlag,
   type InsertFeatureFlag,
+  type Role,
+  type InsertRole,
+  type Permission,
+  type InsertPermission,
+  type RolePermission,
+  type InsertRolePermission,
+  type UserRole,
+  type InsertUserRole,
+  type TeamMember,
+  type InsertTeamMember,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -79,6 +89,42 @@ export interface IStorage {
   updateFeatureFlag(id: string, data: Partial<FeatureFlag>): Promise<FeatureFlag | undefined>;
   deleteFeatureFlag(id: string): Promise<boolean>;
   initializeDefaultFeatureFlags(): Promise<void>;
+
+  // IAM - Roles
+  getRoles(organizationId?: string): Promise<Role[]>;
+  getRole(id: string): Promise<Role | undefined>;
+  createRole(role: InsertRole): Promise<Role>;
+  updateRole(id: string, data: Partial<Role>): Promise<Role | undefined>;
+  deleteRole(id: string): Promise<boolean>;
+
+  // IAM - Permissions
+  getPermissions(): Promise<Permission[]>;
+  getPermission(id: string): Promise<Permission | undefined>;
+  getPermissionByKey(key: string): Promise<Permission | undefined>;
+  createPermission(permission: InsertPermission): Promise<Permission>;
+
+  // IAM - Role Permissions
+  getRolePermissions(roleId: string): Promise<Permission[]>;
+  assignPermissionToRole(roleId: string, permissionId: string): Promise<RolePermission>;
+  removePermissionFromRole(roleId: string, permissionId: string): Promise<boolean>;
+
+  // IAM - User Roles
+  getUserRoles(userId: string): Promise<Role[]>;
+  assignRoleToUser(userId: string, roleId: string, grantedBy: string): Promise<UserRole>;
+  removeRoleFromUser(userId: string, roleId: string): Promise<boolean>;
+
+  // IAM - Team Members
+  getTeamMembers(organizationId: string): Promise<TeamMember[]>;
+  getTeamMember(id: string): Promise<TeamMember | undefined>;
+  getTeamMemberByEmail(email: string, organizationId: string): Promise<TeamMember | undefined>;
+  createTeamMember(member: InsertTeamMember): Promise<TeamMember>;
+  updateTeamMember(id: string, data: Partial<TeamMember>): Promise<TeamMember | undefined>;
+  deleteTeamMember(id: string): Promise<boolean>;
+
+  // IAM - Permission Checks
+  userHasPermission(userId: string, permissionKey: string): Promise<boolean>;
+  initializeDefaultPermissions(): Promise<void>;
+  initializeDefaultRoles(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -90,6 +136,11 @@ export class MemStorage implements IStorage {
   private virtualMachines: Map<string, VirtualMachine>;
   private vmSnapshots: Map<string, VMSnapshot>;
   private featureFlags: Map<string, FeatureFlag>;
+  private roles: Map<string, Role>;
+  private permissions: Map<string, Permission>;
+  private rolePermissions: Map<string, RolePermission>;
+  private userRoles: Map<string, UserRole>;
+  private teamMembers: Map<string, TeamMember>;
 
   constructor() {
     this.users = new Map();
@@ -100,9 +151,16 @@ export class MemStorage implements IStorage {
     this.virtualMachines = new Map();
     this.vmSnapshots = new Map();
     this.featureFlags = new Map();
+    this.roles = new Map();
+    this.permissions = new Map();
+    this.rolePermissions = new Map();
+    this.userRoles = new Map();
+    this.teamMembers = new Map();
     
-    // Initialize default feature flags
+    // Initialize defaults
     this.initializeDefaultFeatureFlags();
+    this.initializeDefaultPermissions();
+    this.initializeDefaultRoles();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -639,6 +697,333 @@ export class MemStorage implements IStorage {
       const existing = await this.getFeatureFlagByKey(flag.key);
       if (!existing) {
         await this.createFeatureFlag(flag);
+      }
+    }
+  }
+
+  // IAM - Roles
+  async getRoles(organizationId?: string): Promise<Role[]> {
+    if (organizationId) {
+      return Array.from(this.roles.values()).filter(
+        (role) => role.organizationId === organizationId || role.isSystem
+      );
+    }
+    return Array.from(this.roles.values());
+  }
+
+  async getRole(id: string): Promise<Role | undefined> {
+    return this.roles.get(id);
+  }
+
+  async createRole(insertRole: InsertRole): Promise<Role> {
+    const id = randomUUID();
+    const role: Role = {
+      id,
+      name: insertRole.name,
+      description: insertRole.description ?? null,
+      isSystem: insertRole.isSystem ?? false,
+      organizationId: insertRole.organizationId ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.roles.set(id, role);
+    return role;
+  }
+
+  async updateRole(id: string, data: Partial<Role>): Promise<Role | undefined> {
+    const role = this.roles.get(id);
+    if (!role) return undefined;
+    const updatedRole = { ...role, ...data, updatedAt: new Date() };
+    this.roles.set(id, updatedRole);
+    return updatedRole;
+  }
+
+  async deleteRole(id: string): Promise<boolean> {
+    return this.roles.delete(id);
+  }
+
+  // IAM - Permissions
+  async getPermissions(): Promise<Permission[]> {
+    return Array.from(this.permissions.values());
+  }
+
+  async getPermission(id: string): Promise<Permission | undefined> {
+    return this.permissions.get(id);
+  }
+
+  async getPermissionByKey(key: string): Promise<Permission | undefined> {
+    return Array.from(this.permissions.values()).find((p) => p.key === key);
+  }
+
+  async createPermission(insertPermission: InsertPermission): Promise<Permission> {
+    const id = randomUUID();
+    const permission: Permission = {
+      id,
+      key: insertPermission.key,
+      name: insertPermission.name,
+      description: insertPermission.description ?? null,
+      category: insertPermission.category,
+      createdAt: new Date(),
+    };
+    this.permissions.set(id, permission);
+    return permission;
+  }
+
+  // IAM - Role Permissions
+  async getRolePermissions(roleId: string): Promise<Permission[]> {
+    const rolePerms = Array.from(this.rolePermissions.values()).filter(
+      (rp) => rp.roleId === roleId
+    );
+    const permissionIds = rolePerms.map((rp) => rp.permissionId);
+    return Array.from(this.permissions.values()).filter((p) =>
+      permissionIds.includes(p.id)
+    );
+  }
+
+  async assignPermissionToRole(roleId: string, permissionId: string): Promise<RolePermission> {
+    const id = randomUUID();
+    const rolePermission: RolePermission = {
+      id,
+      roleId,
+      permissionId,
+      createdAt: new Date(),
+    };
+    this.rolePermissions.set(id, rolePermission);
+    return rolePermission;
+  }
+
+  async removePermissionFromRole(roleId: string, permissionId: string): Promise<boolean> {
+    const rolePerms = Array.from(this.rolePermissions.entries()).filter(
+      ([_, rp]) => rp.roleId === roleId && rp.permissionId === permissionId
+    );
+    if (rolePerms.length === 0) return false;
+    for (const [id] of rolePerms) {
+      this.rolePermissions.delete(id);
+    }
+    return true;
+  }
+
+  // IAM - User Roles
+  async getUserRoles(userId: string): Promise<Role[]> {
+    const userRoleEntries = Array.from(this.userRoles.values()).filter(
+      (ur) => ur.userId === userId
+    );
+    const roleIds = userRoleEntries.map((ur) => ur.roleId);
+    return Array.from(this.roles.values()).filter((r) => roleIds.includes(r.id));
+  }
+
+  async assignRoleToUser(userId: string, roleId: string, grantedBy: string): Promise<UserRole> {
+    const id = randomUUID();
+    const userRole: UserRole = {
+      id,
+      userId,
+      roleId,
+      grantedBy,
+      createdAt: new Date(),
+    };
+    this.userRoles.set(id, userRole);
+    return userRole;
+  }
+
+  async removeRoleFromUser(userId: string, roleId: string): Promise<boolean> {
+    const userRoleEntries = Array.from(this.userRoles.entries()).filter(
+      ([_, ur]) => ur.userId === userId && ur.roleId === roleId
+    );
+    if (userRoleEntries.length === 0) return false;
+    for (const [id] of userRoleEntries) {
+      this.userRoles.delete(id);
+    }
+    return true;
+  }
+
+  // IAM - Team Members
+  async getTeamMembers(organizationId: string): Promise<TeamMember[]> {
+    return Array.from(this.teamMembers.values()).filter(
+      (tm) => tm.organizationId === organizationId
+    );
+  }
+
+  async getTeamMember(id: string): Promise<TeamMember | undefined> {
+    return this.teamMembers.get(id);
+  }
+
+  async getTeamMemberByEmail(email: string, organizationId: string): Promise<TeamMember | undefined> {
+    return Array.from(this.teamMembers.values()).find(
+      (tm) => tm.email === email && tm.organizationId === organizationId
+    );
+  }
+
+  async createTeamMember(insertTeamMember: InsertTeamMember): Promise<TeamMember> {
+    const id = randomUUID();
+    const teamMember: TeamMember = {
+      id,
+      email: insertTeamMember.email,
+      userId: insertTeamMember.userId ?? null,
+      organizationId: insertTeamMember.organizationId,
+      status: insertTeamMember.status ?? "invited",
+      invitedBy: insertTeamMember.invitedBy,
+      invitationToken: insertTeamMember.invitationToken ?? null,
+      invitedAt: new Date(),
+      joinedAt: null,
+    };
+    this.teamMembers.set(id, teamMember);
+    return teamMember;
+  }
+
+  async updateTeamMember(id: string, data: Partial<TeamMember>): Promise<TeamMember | undefined> {
+    const member = this.teamMembers.get(id);
+    if (!member) return undefined;
+    const updatedMember = { ...member, ...data };
+    this.teamMembers.set(id, updatedMember);
+    return updatedMember;
+  }
+
+  async deleteTeamMember(id: string): Promise<boolean> {
+    return this.teamMembers.delete(id);
+  }
+
+  // IAM - Permission Checks
+  async userHasPermission(userId: string, permissionKey: string): Promise<boolean> {
+    // Get all roles for the user
+    const userRolesList = await this.getUserRoles(userId);
+    const roleIds = userRolesList.map((r) => r.id);
+
+    // Get all role permissions for these roles
+    const allRolePerms = Array.from(this.rolePermissions.values()).filter((rp) =>
+      roleIds.includes(rp.roleId)
+    );
+    const permissionIds = allRolePerms.map((rp) => rp.permissionId);
+
+    // Check if any of these permissions match the key
+    const permissions = Array.from(this.permissions.values()).filter((p) =>
+      permissionIds.includes(p.id)
+    );
+    return permissions.some((p) => p.key === permissionKey);
+  }
+
+  async initializeDefaultPermissions(): Promise<void> {
+    const defaultPermissions: InsertPermission[] = [
+      // Compute permissions
+      { key: "vm.view", name: "View Virtual Machines", category: "Compute" },
+      { key: "vm.create", name: "Create Virtual Machines", category: "Compute" },
+      { key: "vm.update", name: "Update Virtual Machines", category: "Compute" },
+      { key: "vm.delete", name: "Delete Virtual Machines", category: "Compute" },
+      { key: "kubernetes.view", name: "View Kubernetes Clusters", category: "Compute" },
+      { key: "kubernetes.create", name: "Create Kubernetes Clusters", category: "Compute" },
+      { key: "kubernetes.delete", name: "Delete Kubernetes Clusters", category: "Compute" },
+      { key: "database.view", name: "View Databases", category: "Compute" },
+      { key: "database.create", name: "Create Databases", category: "Compute" },
+      { key: "database.delete", name: "Delete Databases", category: "Compute" },
+
+      // Networking permissions
+      { key: "network.view", name: "View Networks", category: "Networking" },
+      { key: "network.create", name: "Create Networks", category: "Networking" },
+      { key: "dns.view", name: "View DNS", category: "Networking" },
+      { key: "dns.manage", name: "Manage DNS", category: "Networking" },
+
+      // Storage permissions
+      { key: "storage.view", name: "View Storage", category: "Storage" },
+      { key: "storage.manage", name: "Manage Storage", category: "Storage" },
+
+      // Billing permissions
+      { key: "billing.view", name: "View Billing", category: "Billing" },
+      { key: "billing.manage", name: "Manage Billing", category: "Billing" },
+
+      // IAM permissions
+      { key: "iam.view", name: "View IAM", category: "IAM" },
+      { key: "iam.manage", name: "Manage IAM", category: "IAM" },
+      { key: "team.view", name: "View Team Members", category: "IAM" },
+      { key: "team.manage", name: "Manage Team Members", category: "IAM" },
+    ];
+
+    for (const perm of defaultPermissions) {
+      const existing = await this.getPermissionByKey(perm.key);
+      if (!existing) {
+        await this.createPermission(perm);
+      }
+    }
+  }
+
+  async initializeDefaultRoles(): Promise<void> {
+    const defaultRoles: Array<{ role: InsertRole; permissionKeys: string[] }> = [
+      {
+        role: {
+          name: "Admin",
+          description: "Full access to all resources",
+          isSystem: true,
+        },
+        permissionKeys: [
+          "vm.view", "vm.create", "vm.update", "vm.delete",
+          "kubernetes.view", "kubernetes.create", "kubernetes.delete",
+          "database.view", "database.create", "database.delete",
+          "network.view", "network.create",
+          "dns.view", "dns.manage",
+          "storage.view", "storage.manage",
+          "billing.view", "billing.manage",
+          "iam.view", "iam.manage",
+          "team.view", "team.manage",
+        ],
+      },
+      {
+        role: {
+          name: "Editor",
+          description: "Can create and manage resources but not billing or IAM",
+          isSystem: true,
+        },
+        permissionKeys: [
+          "vm.view", "vm.create", "vm.update", "vm.delete",
+          "kubernetes.view", "kubernetes.create", "kubernetes.delete",
+          "database.view", "database.create", "database.delete",
+          "network.view", "network.create",
+          "dns.view", "dns.manage",
+          "storage.view", "storage.manage",
+          "billing.view",
+          "team.view",
+        ],
+      },
+      {
+        role: {
+          name: "Viewer",
+          description: "Read-only access to all resources",
+          isSystem: true,
+        },
+        permissionKeys: [
+          "vm.view",
+          "kubernetes.view",
+          "database.view",
+          "network.view",
+          "dns.view",
+          "storage.view",
+          "billing.view",
+          "team.view",
+        ],
+      },
+    ];
+
+    for (const { role: roleData, permissionKeys } of defaultRoles) {
+      // Check if role already exists
+      const existingRole = Array.from(this.roles.values()).find(
+        (r) => r.name === roleData.name && r.isSystem
+      );
+      
+      let role: Role;
+      if (!existingRole) {
+        role = await this.createRole(roleData);
+      } else {
+        role = existingRole;
+      }
+
+      // Assign permissions to role
+      for (const permKey of permissionKeys) {
+        const permission = await this.getPermissionByKey(permKey);
+        if (permission) {
+          // Check if permission is already assigned
+          const rolePerms = await this.getRolePermissions(role.id);
+          const alreadyAssigned = rolePerms.some((p) => p.key === permKey);
+          if (!alreadyAssigned) {
+            await this.assignPermissionToRole(role.id, permission.id);
+          }
+        }
       }
     }
   }
