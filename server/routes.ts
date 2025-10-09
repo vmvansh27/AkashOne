@@ -825,6 +825,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // VM SNAPSHOTS
+  // ============================================
+
+  // List VM snapshots
+  app.get("/api/vms/:vmId/snapshots", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const vmId = req.params.vmId;
+
+      // Verify VM ownership
+      const vm = await storage.getVirtualMachine(vmId);
+      if (!vm || vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "VM not found or access denied" });
+      }
+
+      // Get snapshots from storage
+      const snapshots = await storage.getVMSnapshots(vmId, req.session.userId);
+      res.json(snapshots);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Create VM snapshot
+  app.post("/api/vms/:vmId/snapshots", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const vmId = req.params.vmId;
+      const { name, description, snapshotMemory } = req.body;
+
+      // Verify VM ownership
+      const vm = await storage.getVirtualMachine(vmId);
+      if (!vm || vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "VM not found or access denied" });
+      }
+
+      // Call CloudStack API
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      const cloudstackSnapshot = await cloudstack.createVMSnapshot(
+        vm.cloudstackId,
+        name,
+        description,
+        snapshotMemory ?? true
+      );
+
+      // Store snapshot in database
+      const snapshot = await storage.createVMSnapshot({
+        cloudstackSnapshotId: cloudstackSnapshot.id,
+        vmId: vm.id,
+        userId: req.session.userId,
+        name: cloudstackSnapshot.name || name,
+        description: cloudstackSnapshot.description || description || null,
+        state: cloudstackSnapshot.state,
+        snapshotMemory: snapshotMemory ?? true,
+      });
+
+      res.json(snapshot);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete VM snapshot
+  app.delete("/api/snapshots/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const snapshotId = req.params.id;
+
+      // Get snapshot from storage
+      const snapshot = await storage.getVMSnapshot(snapshotId);
+      if (!snapshot) {
+        return res.status(404).json({ message: "Snapshot not found" });
+      }
+
+      // Verify ownership via VM
+      const vm = await storage.getVirtualMachine(snapshot.vmId);
+      if (!vm || vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Call CloudStack API
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      await cloudstack.deleteVMSnapshot(snapshot.cloudstackSnapshotId);
+
+      // Delete from storage
+      await storage.deleteVMSnapshot(snapshotId);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Restore VM to snapshot
+  app.post("/api/snapshots/:id/restore", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const snapshotId = req.params.id;
+
+      // Get snapshot from storage
+      const snapshot = await storage.getVMSnapshot(snapshotId);
+      if (!snapshot) {
+        return res.status(404).json({ message: "Snapshot not found" });
+      }
+
+      // Verify ownership via VM
+      const vm = await storage.getVirtualMachine(snapshot.vmId);
+      if (!vm || vm.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Call CloudStack API
+      const { getCloudStackClient } = await import("./cloudstack/client");
+      const cloudstack = getCloudStackClient();
+      const restoredVM = await cloudstack.revertToVMSnapshot(snapshot.cloudstackSnapshotId);
+
+      // Update VM state in storage
+      if (restoredVM) {
+        await storage.updateVirtualMachine(vm.id, {
+          state: restoredVM.state,
+          lastSynced: new Date(),
+        });
+      }
+
+      res.json({ success: true, vm: restoredVM });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
