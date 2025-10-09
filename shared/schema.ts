@@ -8,6 +8,10 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  gstNumber: text("gst_number").notNull(), // Mandatory GST number for Indian business compliance
+  emailVerified: boolean("email_verified").default(false),
+  emailVerificationCode: text("email_verification_code"),
+  emailVerificationExpiry: timestamp("email_verification_expiry"),
   twoFactorSecret: text("two_factor_secret"),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   accountType: text("account_type").notNull().default("customer"), // super_admin, reseller, customer, team_member
@@ -112,6 +116,9 @@ export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
   password: true,
+  gstNumber: true,
+}).extend({
+  gstNumber: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, "Invalid GST number format"),
 });
 
 export const insertKubernetesClusterSchema = createInsertSchema(kubernetesClusters).omit({
