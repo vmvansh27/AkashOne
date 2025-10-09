@@ -21,9 +21,42 @@ export default function Login() {
     twoFactorCode: "",
   });
   const [sessionToken, setSessionToken] = useState("");
+  const [gstError, setGstError] = useState<string>("");
+
+  const validateGST = (gst: string): string => {
+    if (gst.length === 0) return "";
+    if (gst.length !== 15) return `GST must be exactly 15 characters (currently ${gst.length})`;
+    
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (!gstRegex.test(gst)) {
+      // Detailed validation with anchored regex
+      if (!/^[0-9]{2}$/.test(gst.slice(0, 2))) return "First 2 characters must be digits (state code)";
+      if (!/^[A-Z]{5}$/.test(gst.slice(2, 7))) return "Characters 3-7 must be uppercase letters (PAN)";
+      if (!/^[0-9]{4}$/.test(gst.slice(7, 11))) return "Characters 8-11 must be digits";
+      if (!/^[A-Z]$/.test(gst.slice(11, 12))) return "Character 12 must be an uppercase letter";
+      if (!/^[1-9A-Z]$/.test(gst.slice(12, 13))) return "Character 13 must be 1-9 or A-Z";
+      if (gst[13] !== 'Z') return "Character 14 must be 'Z'";
+      if (!/^[0-9A-Z]$/.test(gst.slice(14, 15))) return "Character 15 must be a digit or letter";
+    }
+    return "";
+  };
 
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate GST number before submitting registration
+    if (!isLogin) {
+      const gstValidationError = validateGST(formData.gstNumber);
+      if (gstValidationError) {
+        setGstError(gstValidationError);
+        toast({
+          title: "Invalid GST Number",
+          description: gstValidationError,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
 
     try {
       if (isLogin) {
@@ -58,6 +91,7 @@ export default function Login() {
         });
         setIsLogin(true);
         setFormData({ ...formData, password: "", gstNumber: "" });
+        setGstError(""); // Clear GST error after successful registration
       }
     } catch (error: any) {
       toast({
@@ -211,17 +245,25 @@ export default function Login() {
                       id="gstNumber"
                       type="text"
                       placeholder="29ABCDE1234F1Z5"
-                      className="pl-9 font-mono uppercase"
+                      className={`pl-9 font-mono uppercase ${gstError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                       value={formData.gstNumber}
-                      onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value.toUpperCase() })}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        setFormData({ ...formData, gstNumber: value });
+                        setGstError(validateGST(value));
+                      }}
                       maxLength={15}
                       required
                       data-testid="input-gst-number"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    15 characters: 2 digits (state) + 10 alphanumeric (PAN) + Z + 1 digit
-                  </p>
+                  {gstError ? (
+                    <p className="text-xs text-destructive">{gstError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Format: 22AAAAA0000A1Z5 (2 digits + 5 letters + 4 digits + letter + digit/letter + Z + digit/letter)
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -253,6 +295,7 @@ export default function Login() {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setFormData({ username: "", email: "", password: "", gstNumber: "", twoFactorCode: "" });
+                  setGstError(""); // Clear GST error when toggling modes
                 }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-toggle-mode"
