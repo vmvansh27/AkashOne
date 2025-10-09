@@ -32,7 +32,11 @@ const menuItems: MenuItem[] = [
     title: "Virtual Machines",
     url: "/vms",
     icon: Server,
-    featureKey: "virtual_machines",
+  },
+  {
+    title: "Networks",
+    url: "/networks",
+    icon: Network,
   },
   {
     title: "Kubernetes",
@@ -57,11 +61,6 @@ const menuItems: MenuItem[] = [
     url: "/dns",
     icon: Globe,
     featureKey: "dns",
-  },
-  {
-    title: "Networks",
-    url: "/networks",
-    icon: Network,
   },
   {
     title: "Storage",
