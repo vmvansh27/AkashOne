@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { randomUUID } from "crypto";
 import session from "express-session";
 import { storage } from "./storage";
 import {
@@ -1036,6 +1037,443 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updatedFlag);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===================================
+  // IAM - Roles Management
+  // ===================================
+
+  // Get all roles (filtered by organization if user is not admin)
+  app.get("/api/iam/roles", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get roles - system roles plus org-specific roles
+      const roles = await storage.getRoles(user.organizationId ?? undefined);
+      res.json(roles);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create custom role
+  app.post("/api/iam/roles", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Check permission
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const { name, description } = req.body;
+      if (!name) {
+        return res.status(400).json({ message: "Role name is required" });
+      }
+
+      const role = await storage.createRole({
+        name,
+        description,
+        isSystem: false,
+        organizationId: user.organizationId,
+      });
+
+      res.status(201).json(role);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update role
+  app.patch("/api/iam/roles/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const role = await storage.getRole(req.params.id);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (role.isSystem) {
+        return res.status(400).json({ message: "Cannot modify system roles" });
+      }
+
+      const { name, description } = req.body;
+      const updatedRole = await storage.updateRole(req.params.id, { name, description });
+      res.json(updatedRole);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete role
+  app.delete("/api/iam/roles/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const role = await storage.getRole(req.params.id);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (role.isSystem) {
+        return res.status(400).json({ message: "Cannot delete system roles" });
+      }
+
+      await storage.deleteRole(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===================================
+  // IAM - Permissions Management
+  // ===================================
+
+  // Get all permissions
+  app.get("/api/iam/permissions", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const permissions = await storage.getPermissions();
+      res.json(permissions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get permissions for a specific role
+  app.get("/api/iam/roles/:roleId/permissions", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const permissions = await storage.getRolePermissions(req.params.roleId);
+      res.json(permissions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Assign permission to role
+  app.post("/api/iam/roles/:roleId/permissions", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const role = await storage.getRole(req.params.roleId);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (role.isSystem) {
+        return res.status(400).json({ message: "Cannot modify system role permissions" });
+      }
+
+      const { permissionId } = req.body;
+      if (!permissionId) {
+        return res.status(400).json({ message: "Permission ID is required" });
+      }
+
+      const rolePermission = await storage.assignPermissionToRole(req.params.roleId, permissionId);
+      res.status(201).json(rolePermission);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove permission from role
+  app.delete("/api/iam/roles/:roleId/permissions/:permissionId", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const role = await storage.getRole(req.params.roleId);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (role.isSystem) {
+        return res.status(400).json({ message: "Cannot modify system role permissions" });
+      }
+
+      await storage.removePermissionFromRole(req.params.roleId, req.params.permissionId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===================================
+  // IAM - Team Members Management
+  // ===================================
+
+  // Get all team members in organization
+  app.get("/api/iam/team-members", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organizationId) {
+        return res.status(400).json({ message: "User not associated with an organization" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "team.view");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const teamMembers = await storage.getTeamMembers(user.organizationId);
+      
+      // Enrich with user roles
+      const enrichedMembers = await Promise.all(
+        teamMembers.map(async (member) => {
+          if (member.userId) {
+            const roles = await storage.getUserRoles(member.userId);
+            return { ...member, roles };
+          }
+          return { ...member, roles: [] };
+        })
+      );
+
+      res.json(enrichedMembers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Invite team member
+  app.post("/api/iam/team-members", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organizationId) {
+        return res.status(400).json({ message: "User not associated with an organization" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "team.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const { email, roleIds } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Check if member already exists
+      const existing = await storage.getTeamMemberByEmail(email, user.organizationId);
+      if (existing) {
+        return res.status(400).json({ message: "Team member already exists" });
+      }
+
+      // Generate invitation token
+      const invitationToken = randomUUID();
+
+      const teamMember = await storage.createTeamMember({
+        email,
+        organizationId: user.organizationId,
+        invitedBy: req.session.userId,
+        invitationToken,
+        status: "invited",
+      });
+
+      // TODO: Send invitation email with token
+
+      res.status(201).json(teamMember);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update team member (change status, assign roles, etc.)
+  app.patch("/api/iam/team-members/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "team.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const member = await storage.getTeamMember(req.params.id);
+      if (!member) {
+        return res.status(404).json({ message: "Team member not found" });
+      }
+
+      const { status } = req.body;
+      const updatedMember = await storage.updateTeamMember(req.params.id, { status });
+      res.json(updatedMember);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove team member
+  app.delete("/api/iam/team-members/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "team.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const member = await storage.getTeamMember(req.params.id);
+      if (!member) {
+        return res.status(404).json({ message: "Team member not found" });
+      }
+
+      await storage.deleteTeamMember(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===================================
+  // IAM - User Role Assignments
+  // ===================================
+
+  // Get roles for a user
+  app.get("/api/iam/users/:userId/roles", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "team.view");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const roles = await storage.getUserRoles(req.params.userId);
+      res.json(roles);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Assign role to user
+  app.post("/api/iam/users/:userId/roles", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "team.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const { roleId } = req.body;
+      if (!roleId) {
+        return res.status(400).json({ message: "Role ID is required" });
+      }
+
+      const userRole = await storage.assignRoleToUser(
+        req.params.userId,
+        roleId,
+        req.session.userId
+      );
+      res.status(201).json(userRole);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove role from user
+  app.delete("/api/iam/users/:userId/roles/:roleId", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const hasPermission = await storage.userHasPermission(req.session.userId, "team.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      await storage.removeRoleFromUser(req.params.userId, req.params.roleId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get current user's permissions
+  app.get("/api/iam/me/permissions", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const roles = await storage.getUserRoles(req.session.userId);
+      const allPermissions: Set<string> = new Set();
+
+      for (const role of roles) {
+        const permissions = await storage.getRolePermissions(role.id);
+        permissions.forEach((p) => allPermissions.add(p.key));
+      }
+
+      res.json(Array.from(allPermissions));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
