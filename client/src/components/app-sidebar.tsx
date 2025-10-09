@@ -139,6 +139,11 @@ const adminItems: MenuItem[] = [
     icon: Users,
   },
   {
+    title: "Role Management",
+    url: "/role-management",
+    icon: Shield,
+  },
+  {
     title: "Security",
     url: "/security",
     icon: Shield,
