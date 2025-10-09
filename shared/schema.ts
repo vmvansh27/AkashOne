@@ -57,6 +57,30 @@ export const databases = pgTable("databases", {
   userId: varchar("user_id").references(() => users.id),
 });
 
+export const dnsDomains = pgTable("dns_domains", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  status: text("status").notNull().default("pending"),
+  recordCount: integer("record_count").notNull().default(0),
+  dnssec: boolean("dnssec").notNull().default(false),
+  nameservers: text("nameservers").array().notNull().default(sql`ARRAY['ns1.akashone.com', 'ns2.akashone.com']::text[]`),
+  lastModified: timestamp("last_modified").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const dnsRecords = pgTable("dns_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  domainId: varchar("domain_id").notNull().references(() => dnsDomains.id, { onDelete: 'cascade' }),
+  type: text("type").notNull(),
+  name: text("name").notNull(),
+  value: text("value").notNull(),
+  ttl: integer("ttl").notNull().default(3600),
+  priority: integer("priority"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
@@ -82,9 +106,27 @@ export const insertDatabaseSchema = createInsertSchema(databases).omit({
   userId: true,
 });
 
+export const insertDnsDomainSchema = createInsertSchema(dnsDomains).omit({
+  id: true,
+  createdAt: true,
+  lastModified: true,
+  recordCount: true,
+  userId: true,
+});
+
+export const insertDnsRecordSchema = createInsertSchema(dnsRecords).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type KubernetesCluster = typeof kubernetesClusters.$inferSelect;
 export type InsertKubernetesCluster = z.infer<typeof insertKubernetesClusterSchema>;
 export type Database = typeof databases.$inferSelect;
 export type InsertDatabase = z.infer<typeof insertDatabaseSchema>;
+export type DnsDomain = typeof dnsDomains.$inferSelect;
+export type InsertDnsDomain = z.infer<typeof insertDnsDomainSchema>;
+export type DnsRecord = typeof dnsRecords.$inferSelect;
+export type InsertDnsRecord = z.infer<typeof insertDnsRecordSchema>;

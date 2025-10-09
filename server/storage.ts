@@ -5,6 +5,10 @@ import {
   type InsertKubernetesCluster,
   type Database,
   type InsertDatabase,
+  type DnsDomain,
+  type InsertDnsDomain,
+  type DnsRecord,
+  type InsertDnsRecord,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -31,17 +35,35 @@ export interface IStorage {
   createDatabase(database: InsertDatabase & { userId: string }): Promise<Database>;
   updateDatabase(id: string, data: Partial<Database>): Promise<Database | undefined>;
   deleteDatabase(id: string): Promise<boolean>;
+
+  // DNS Domains
+  getDnsDomains(userId: string): Promise<DnsDomain[]>;
+  getDnsDomain(id: string): Promise<DnsDomain | undefined>;
+  createDnsDomain(domain: InsertDnsDomain & { userId: string }): Promise<DnsDomain>;
+  updateDnsDomain(id: string, data: Partial<DnsDomain>): Promise<DnsDomain | undefined>;
+  deleteDnsDomain(id: string): Promise<boolean>;
+
+  // DNS Records
+  getDnsRecords(domainId: string): Promise<DnsRecord[]>;
+  getDnsRecord(id: string): Promise<DnsRecord | undefined>;
+  createDnsRecord(record: InsertDnsRecord & { userId: string }): Promise<DnsRecord>;
+  updateDnsRecord(id: string, data: Partial<DnsRecord>): Promise<DnsRecord | undefined>;
+  deleteDnsRecord(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private kubernetesClusters: Map<string, KubernetesCluster>;
   private databases: Map<string, Database>;
+  private dnsDomains: Map<string, DnsDomain>;
+  private dnsRecords: Map<string, DnsRecord>;
 
   constructor() {
     this.users = new Map();
     this.kubernetesClusters = new Map();
     this.databases = new Map();
+    this.dnsDomains = new Map();
+    this.dnsRecords = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -196,6 +218,119 @@ export class MemStorage implements IStorage {
 
   async deleteDatabase(id: string): Promise<boolean> {
     return this.databases.delete(id);
+  }
+
+  // DNS Domain methods
+  async getDnsDomains(userId: string): Promise<DnsDomain[]> {
+    return Array.from(this.dnsDomains.values()).filter(
+      (domain) => domain.userId === userId,
+    );
+  }
+
+  async getDnsDomain(id: string): Promise<DnsDomain | undefined> {
+    return this.dnsDomains.get(id);
+  }
+
+  async createDnsDomain(domain: InsertDnsDomain & { userId: string }): Promise<DnsDomain> {
+    const id = `dns-${randomUUID().slice(0, 8)}`;
+    const newDomain: DnsDomain = {
+      id,
+      name: domain.name,
+      status: domain.status || "pending",
+      recordCount: 0,
+      dnssec: domain.dnssec ?? false,
+      nameservers: domain.nameservers || ["ns1.akashone.com", "ns2.akashone.com"],
+      lastModified: new Date(),
+      createdAt: new Date(),
+      userId: domain.userId,
+    };
+    this.dnsDomains.set(id, newDomain);
+    return newDomain;
+  }
+
+  async updateDnsDomain(id: string, data: Partial<DnsDomain>): Promise<DnsDomain | undefined> {
+    const domain = this.dnsDomains.get(id);
+    if (!domain) return undefined;
+    const updatedDomain = { ...domain, ...data, lastModified: new Date() };
+    this.dnsDomains.set(id, updatedDomain);
+    return updatedDomain;
+  }
+
+  async deleteDnsDomain(id: string): Promise<boolean> {
+    // Delete all records for this domain
+    const records = Array.from(this.dnsRecords.values()).filter(
+      (record) => record.domainId === id,
+    );
+    records.forEach((record) => this.dnsRecords.delete(record.id));
+    return this.dnsDomains.delete(id);
+  }
+
+  // DNS Record methods
+  async getDnsRecords(domainId: string): Promise<DnsRecord[]> {
+    return Array.from(this.dnsRecords.values()).filter(
+      (record) => record.domainId === domainId,
+    );
+  }
+
+  async getDnsRecord(id: string): Promise<DnsRecord | undefined> {
+    return this.dnsRecords.get(id);
+  }
+
+  async createDnsRecord(record: InsertDnsRecord & { userId: string }): Promise<DnsRecord> {
+    const id = `rec-${randomUUID().slice(0, 8)}`;
+    const newRecord: DnsRecord = {
+      id,
+      domainId: record.domainId,
+      type: record.type,
+      name: record.name,
+      value: record.value,
+      ttl: record.ttl ?? 3600,
+      priority: record.priority ?? null,
+      createdAt: new Date(),
+      userId: record.userId,
+    };
+    this.dnsRecords.set(id, newRecord);
+    
+    // Update domain record count
+    const domain = this.dnsDomains.get(record.domainId);
+    if (domain) {
+      domain.recordCount += 1;
+      domain.lastModified = new Date();
+      this.dnsDomains.set(domain.id, domain);
+    }
+    
+    return newRecord;
+  }
+
+  async updateDnsRecord(id: string, data: Partial<DnsRecord>): Promise<DnsRecord | undefined> {
+    const record = this.dnsRecords.get(id);
+    if (!record) return undefined;
+    const updatedRecord = { ...record, ...data };
+    this.dnsRecords.set(id, updatedRecord);
+    
+    // Update domain lastModified
+    const domain = this.dnsDomains.get(record.domainId);
+    if (domain) {
+      domain.lastModified = new Date();
+      this.dnsDomains.set(domain.id, domain);
+    }
+    
+    return updatedRecord;
+  }
+
+  async deleteDnsRecord(id: string): Promise<boolean> {
+    const record = this.dnsRecords.get(id);
+    if (!record) return false;
+    
+    // Update domain record count
+    const domain = this.dnsDomains.get(record.domainId);
+    if (domain) {
+      domain.recordCount = Math.max(0, domain.recordCount - 1);
+      domain.lastModified = new Date();
+      this.dnsDomains.set(domain.id, domain);
+    }
+    
+    return this.dnsRecords.delete(id);
   }
 }
 

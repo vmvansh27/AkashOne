@@ -43,204 +43,188 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface Domain {
-  id: string;
-  name: string;
-  status: "active" | "pending" | "error";
-  recordCount: number;
-  dnssec: boolean;
-  lastModified: string;
-  nameservers: string[];
-}
-
-interface DNSRecord {
-  id: string;
-  domainId: string;
-  type: "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS" | "SRV";
-  name: string;
-  value: string;
-  ttl: number;
-  priority?: number;
-}
-
-const mockDomains: Domain[] = [
-  {
-    id: "domain-1",
-    name: "akashone.com",
-    status: "active",
-    recordCount: 12,
-    dnssec: true,
-    lastModified: "2024-10-08",
-    nameservers: ["ns1.akashone.com", "ns2.akashone.com"],
-  },
-  {
-    id: "domain-2",
-    name: "example.net",
-    status: "active",
-    recordCount: 8,
-    dnssec: false,
-    lastModified: "2024-10-07",
-    nameservers: ["ns1.akashone.com", "ns2.akashone.com"],
-  },
-  {
-    id: "domain-3",
-    name: "testsite.org",
-    status: "pending",
-    recordCount: 3,
-    dnssec: false,
-    lastModified: "2024-10-09",
-    nameservers: ["ns1.akashone.com", "ns2.akashone.com"],
-  },
-];
-
-const mockRecords: DNSRecord[] = [
-  {
-    id: "rec-1",
-    domainId: "domain-1",
-    type: "A",
-    name: "@",
-    value: "192.168.1.1",
-    ttl: 3600,
-  },
-  {
-    id: "rec-2",
-    domainId: "domain-1",
-    type: "A",
-    name: "www",
-    value: "192.168.1.1",
-    ttl: 3600,
-  },
-  {
-    id: "rec-3",
-    domainId: "domain-1",
-    type: "CNAME",
-    name: "blog",
-    value: "akashone.com",
-    ttl: 3600,
-  },
-  {
-    id: "rec-4",
-    domainId: "domain-1",
-    type: "MX",
-    name: "@",
-    value: "mail.akashone.com",
-    ttl: 3600,
-    priority: 10,
-  },
-  {
-    id: "rec-5",
-    domainId: "domain-1",
-    type: "TXT",
-    name: "@",
-    value: "v=spf1 include:_spf.akashone.com ~all",
-    ttl: 3600,
-  },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { DnsDomain, DnsRecord } from "@shared/schema";
 
 export default function DNS() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<DnsDomain | null>(null);
   const [createDomainOpen, setCreateDomainOpen] = useState(false);
   const [createRecordOpen, setCreateRecordOpen] = useState(false);
-  const [domains, setDomains] = useState<Domain[]>(mockDomains);
-  const [records, setRecords] = useState<DNSRecord[]>(mockRecords);
   const [newDomain, setNewDomain] = useState({
     name: "",
     dnssec: false,
   });
   const [newRecord, setNewRecord] = useState({
-    type: "A" as DNSRecord["type"],
+    type: "A" as DnsRecord["type"],
     name: "",
     value: "",
     ttl: "3600",
     priority: "",
   });
 
+  // Fetch DNS domains
+  const { data: domains = [], isLoading: domainsLoading } = useQuery<DnsDomain[]>({
+    queryKey: ["/api/dns/domains"],
+  });
+
+  // Fetch DNS records for selected domain
+  const { data: records = [], isLoading: recordsLoading } = useQuery<DnsRecord[]>({
+    queryKey: ["/api/dns/records", selectedDomain?.id],
+    enabled: !!selectedDomain,
+  });
+
+  // Create domain mutation
+  const createDomainMutation = useMutation({
+    mutationFn: async (data: { name: string; dnssec: boolean }) => {
+      return await apiRequest("POST", "/api/dns/domains", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dns/domains"] });
+      toast({
+        title: "Domain created",
+        description: "DNS domain has been created successfully",
+      });
+      setCreateDomainOpen(false);
+      setNewDomain({ name: "", dnssec: false });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create domain",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete domain mutation
+  const deleteDomainMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/dns/domains/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dns/domains"] });
+      if (selectedDomain) {
+        setSelectedDomain(null);
+      }
+      toast({
+        title: "Domain deleted",
+        description: "DNS domain has been deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete domain",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create record mutation
+  const createRecordMutation = useMutation({
+    mutationFn: async (data: {
+      domainId: string;
+      type: string;
+      name: string;
+      value: string;
+      ttl: number;
+      priority?: number;
+    }) => {
+      return await apiRequest("POST", "/api/dns/records", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dns/records", selectedDomain?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dns/domains"] });
+      toast({
+        title: "Record created",
+        description: "DNS record has been created successfully",
+      });
+      setCreateRecordOpen(false);
+      setNewRecord({ type: "A", name: "", value: "", ttl: "3600", priority: "" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create record",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete record mutation
+  const deleteRecordMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/dns/records/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dns/records", selectedDomain?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dns/domains"] });
+      toast({
+        title: "Record deleted",
+        description: "DNS record has been deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete record",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredDomains = domains.filter((domain) =>
     domain.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const currentDomainRecords = selectedDomain
-    ? records.filter((rec) => rec.domainId === selectedDomain.id)
-    : [];
+  const currentDomainRecords = records;
 
   const handleCreateDomain = () => {
-    const domain: Domain = {
-      id: `domain-${Date.now()}`,
-      name: newDomain.name,
-      status: "pending",
-      recordCount: 0,
-      dnssec: newDomain.dnssec,
-      lastModified: new Date().toISOString().split("T")[0],
-      nameservers: ["ns1.akashone.com", "ns2.akashone.com"],
-    };
-
-    setDomains([...domains, domain]);
-    toast({
-      title: "Domain Added",
-      description: `DNS zone for "${domain.name}" has been created successfully.`,
-    });
-    setCreateDomainOpen(false);
-    setNewDomain({ name: "", dnssec: false });
+    if (!newDomain.name) {
+      toast({
+        title: "Error",
+        description: "Please enter a domain name",
+        variant: "destructive",
+      });
+      return;
+    }
+    createDomainMutation.mutate(newDomain);
   };
 
-  const handleDeleteDomain = (domain: Domain) => {
+  const handleDeleteDomain = (domain: DnsDomain) => {
     if (confirm(`Are you sure you want to delete "${domain.name}" and all its DNS records?`)) {
-      setDomains(domains.filter((d) => d.id !== domain.id));
-      setRecords(records.filter((r) => r.domainId !== domain.id));
-      if (selectedDomain?.id === domain.id) {
-        setSelectedDomain(null);
-      }
-      toast({
-        title: "Domain Deleted",
-        description: `Domain "${domain.name}" has been deleted.`,
-      });
+      deleteDomainMutation.mutate(domain.id);
     }
   };
 
   const handleCreateRecord = () => {
     if (!selectedDomain) return;
 
-    const record: DNSRecord = {
-      id: `rec-${Date.now()}`,
+    if (!newRecord.name || !newRecord.value) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createRecordMutation.mutate({
       domainId: selectedDomain.id,
       type: newRecord.type,
       name: newRecord.name,
       value: newRecord.value,
       ttl: parseInt(newRecord.ttl),
       priority: newRecord.priority ? parseInt(newRecord.priority) : undefined,
-    };
-
-    setRecords([...records, record]);
-    setDomains(
-      domains.map((d) =>
-        d.id === selectedDomain.id ? { ...d, recordCount: d.recordCount + 1 } : d
-      )
-    );
-    toast({
-      title: "DNS Record Created",
-      description: `${record.type} record has been added successfully.`,
     });
-    setCreateRecordOpen(false);
-    setNewRecord({ type: "A", name: "", value: "", ttl: "3600", priority: "" });
   };
 
-  const handleDeleteRecord = (record: DNSRecord) => {
+  const handleDeleteRecord = (record: DnsRecord) => {
     if (confirm(`Are you sure you want to delete this ${record.type} record?`)) {
-      setRecords(records.filter((r) => r.id !== record.id));
-      if (selectedDomain) {
-        setDomains(
-          domains.map((d) =>
-            d.id === selectedDomain.id ? { ...d, recordCount: d.recordCount - 1 } : d
-          )
-        );
-      }
-      toast({
-        title: "Record Deleted",
-        description: "DNS record has been deleted.",
-      });
+      deleteRecordMutation.mutate(record.id);
     }
   };
 
@@ -526,7 +510,7 @@ export default function DNS() {
                           <Label htmlFor="record-type">Record Type</Label>
                           <Select
                             value={newRecord.type}
-                            onValueChange={(value: DNSRecord["type"]) =>
+                            onValueChange={(value: DnsRecord["type"]) =>
                               setNewRecord({ ...newRecord, type: value })
                             }
                           >

@@ -342,6 +342,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DNS Domain endpoints
+  app.get("/api/dns/domains", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const domains = await storage.getDnsDomains(req.session.userId);
+      res.json(domains);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/dns/domains", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { name, dnssec, nameservers } = req.body;
+
+      if (!name) {
+        return res.status(400).json({ message: "Domain name is required" });
+      }
+
+      const domain = await storage.createDnsDomain({
+        name,
+        dnssec: dnssec === true,
+        nameservers: nameservers || undefined,
+        status: "pending",
+        userId: req.session.userId,
+      });
+
+      res.json(domain);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/dns/domains/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      
+      // Verify ownership before allowing update
+      const existingDomain = await storage.getDnsDomain(id);
+      if (!existingDomain) {
+        return res.status(404).json({ message: "Domain not found" });
+      }
+      if (existingDomain.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Sanitize updates - only allow specific fields, never userId
+      const { status, dnssec, nameservers } = req.body;
+      const sanitizedUpdates: any = {};
+      if (status !== undefined) sanitizedUpdates.status = status;
+      if (dnssec !== undefined) sanitizedUpdates.dnssec = dnssec;
+      if (nameservers !== undefined) sanitizedUpdates.nameservers = nameservers;
+
+      const domain = await storage.updateDnsDomain(id, sanitizedUpdates);
+
+      res.json(domain);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/dns/domains/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      
+      // Verify ownership before allowing delete
+      const existingDomain = await storage.getDnsDomain(id);
+      if (!existingDomain) {
+        return res.status(404).json({ message: "Domain not found" });
+      }
+      if (existingDomain.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const deleted = await storage.deleteDnsDomain(id);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // DNS Record endpoints
+  app.get("/api/dns/records/:domainId", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { domainId } = req.params;
+      
+      // Verify domain ownership before returning records
+      const domain = await storage.getDnsDomain(domainId);
+      if (!domain) {
+        return res.status(404).json({ message: "Domain not found" });
+      }
+      if (domain.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const records = await storage.getDnsRecords(domainId);
+      res.json(records);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/dns/records", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { domainId, type, name, value, ttl, priority } = req.body;
+
+      if (!domainId || !type || !name || !value) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Verify domain ownership before creating record
+      const domain = await storage.getDnsDomain(domainId);
+      if (!domain) {
+        return res.status(404).json({ message: "Domain not found" });
+      }
+      if (domain.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const record = await storage.createDnsRecord({
+        domainId,
+        type,
+        name,
+        value,
+        ttl: ttl ? parseInt(ttl) : undefined,
+        priority: priority ? parseInt(priority) : undefined,
+        userId: req.session.userId,
+      });
+
+      res.json(record);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/dns/records/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      
+      // Verify record ownership before allowing update
+      const existingRecord = await storage.getDnsRecord(id);
+      if (!existingRecord) {
+        return res.status(404).json({ message: "Record not found" });
+      }
+      if (existingRecord.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Sanitize updates - only allow specific fields, never userId or domainId
+      const { type, name, value, ttl, priority } = req.body;
+      const sanitizedUpdates: any = {};
+      if (type !== undefined) sanitizedUpdates.type = type;
+      if (name !== undefined) sanitizedUpdates.name = name;
+      if (value !== undefined) sanitizedUpdates.value = value;
+      if (ttl !== undefined) sanitizedUpdates.ttl = ttl;
+      if (priority !== undefined) sanitizedUpdates.priority = priority;
+
+      const record = await storage.updateDnsRecord(id, sanitizedUpdates);
+
+      res.json(record);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/dns/records/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      
+      // Verify record ownership before allowing delete
+      const existingRecord = await storage.getDnsRecord(id);
+      if (!existingRecord) {
+        return res.status(404).json({ message: "Record not found" });
+      }
+      if (existingRecord.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const deleted = await storage.deleteDnsRecord(id);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
