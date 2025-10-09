@@ -10,6 +10,17 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 
 ### October 2025 - Major Feature Additions
 
+#### Virtual Machine Management with CloudStack Integration ✅
+- Full CloudStack API integration with HMAC SHA1 authentication
+- Async job polling for VM lifecycle operations
+- VM provisioning wizard with zone, template, and service offering selection
+- Real-time VM state management (Running, Stopped, Starting, etc.)
+- VM lifecycle controls: Start, Stop, Reboot, Destroy
+- Resource monitoring: CPU, memory, IP addresses
+- VM caching in PostgreSQL for fast queries
+- Form validation to prevent zone/template mismatches
+- Complete ownership verification and multi-tenant security
+
 #### Kubernetes-as-a-Service (KaaS)
 - One-click Kubernetes cluster deployment with version selection
 - Master and worker node configuration
@@ -56,13 +67,17 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 ### Backend (Express + TypeScript)
 - **Storage:** MemStorage with support for PostgreSQL (Drizzle ORM)
 - **Authentication:** Session-based with passport, bcrypt, otplib, QRCode
+- **CloudStack Integration:** Direct API client with async job polling
 - **API Routes:**
   - `/api/auth/*` - Authentication endpoints
+  - `/api/vms` - Virtual machine management with CloudStack proxy
+  - `/api/cloudstack/*` - CloudStack metadata (zones, templates, offerings)
   - `/api/kubernetes/clusters` - Kubernetes cluster management
   - `/api/databases` - Database instance management
 
 ### Database Schema
 - **users:** User accounts with 2FA fields
+- **virtual_machines:** VM cache with CloudStack IDs and metadata
 - **kubernetes_clusters:** K8s cluster configurations and metrics
 - **databases:** Database instance configurations and monitoring
 
@@ -113,6 +128,9 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 ### Environment Secrets
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Session encryption key
+- `CLOUDSTACK_API_URL` - CloudStack API endpoint (required for VM provisioning)
+- `CLOUDSTACK_API_KEY` - CloudStack API key (required for VM provisioning)
+- `CLOUDSTACK_SECRET_KEY` - CloudStack secret key (required for VM provisioning)
 - User-specific: TOTP secrets stored encrypted in database
 
 ## API Documentation
@@ -126,6 +144,17 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 - `POST /api/auth/2fa/enable` - Enable 2FA
 - `POST /api/auth/2fa/disable` - Disable 2FA
 - `POST /api/auth/logout` - Logout
+
+### Virtual Machines (CloudStack)
+- `GET /api/vms` - List user's virtual machines
+- `POST /api/vms` - Deploy new VM (async with job polling)
+- `POST /api/vms/:id/start` - Start stopped VM
+- `POST /api/vms/:id/stop` - Stop running VM
+- `POST /api/vms/:id/reboot` - Reboot running VM
+- `DELETE /api/vms/:id` - Destroy VM (expunge from CloudStack)
+- `GET /api/cloudstack/zones` - List available zones
+- `GET /api/cloudstack/templates?zoneId=X` - List OS templates for zone
+- `GET /api/cloudstack/service-offerings` - List compute plans
 
 ### Kubernetes Clusters
 - `GET /api/kubernetes/clusters` - List all clusters
