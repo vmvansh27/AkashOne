@@ -10,6 +10,24 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 
 ### October 2025 - Major Feature Additions
 
+#### Feature Management System ✅
+- **Super Admin Feature Toggle System:**
+  - Centralized feature flag management with enable/disable controls
+  - Features organized by category (Compute, Networking, Billing, Storage)
+  - Dynamic sidebar navigation that shows/hides features based on flags
+  - Feature flag middleware for API route protection
+  - 7 new feature pages with professional placeholder UIs:
+    - Payment Gateway Configuration (Stripe, Razorpay, PayPal)
+    - Interactive Pricing Calculator
+    - Load Balancer Service
+    - GPU Instances (NVIDIA T4, A100, V100)
+    - SSL Certificate Manager (Let's Encrypt integration)
+    - CDN Service (Global content delivery)
+    - VM Auto-Scaling Groups
+  - All new features start disabled and can be enabled when backend is ready
+  - Real-time navigation updates without page reload
+  - Full integration with existing authentication and multi-tenant system
+
 #### Virtual Machine Management with CloudStack Integration ✅
 - Full CloudStack API integration with HMAC SHA1 authentication
 - Async job polling for VM lifecycle operations
@@ -64,10 +82,18 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
   - Storage - Storage management
   - Monitoring - Resource monitoring with real-time metrics
   - Billing - Indian GST-compliant billing with CGST/SGST/IGST
+  - Payment Gateways - Payment provider configuration (Stripe, Razorpay, PayPal)
+  - Pricing Calculator - Infrastructure cost estimation tool
+  - Load Balancer - High-availability load balancing service
+  - GPU Instances - NVIDIA GPU compute for AI/ML workloads
+  - SSL Certificates - Automated SSL/TLS certificate management
+  - CDN Service - Global content delivery network
+  - Auto-Scaling - VM auto-scaling groups with dynamic policies
   - Resellers - Reseller management
   - White-Label - Custom branding and domains
   - Reseller Customers - Customer management
   - Super Admin - Hierarchical tenant tree management
+  - Feature Management - Enable/disable features dynamically
   - Admin Rights - RBAC administration
   - Security - 2FA and security settings
   - Login - Authentication page
@@ -85,6 +111,10 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
   - `/api/cloudstack/*` - CloudStack metadata (zones, templates, offerings)
   - `/api/kubernetes/clusters` - Kubernetes cluster management
   - `/api/databases` - Database instance management
+  - `/api/feature-flags` - Feature flag management (list all, update)
+  - `/api/feature-flags/:id` - Individual feature flag operations
+- **Middleware:**
+  - `requireFeature(key)` - Feature flag validation for API routes
 
 ### Database Schema
 - **users:** User accounts with 2FA fields
@@ -92,6 +122,7 @@ AkashOne.com is a comprehensive CloudStack management platform featuring VM prov
 - **vm_snapshots:** VM snapshot records with CloudStack snapshot IDs, names, descriptions, and state tracking
 - **kubernetes_clusters:** K8s cluster configurations and metrics
 - **databases:** Database instance configurations and monitoring
+- **feature_flags:** Feature toggle system with key, name, description, category, enabled status, icon, and sort order
 
 ## User Preferences
 
