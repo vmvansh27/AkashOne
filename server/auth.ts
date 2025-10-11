@@ -146,9 +146,15 @@ export async function loginUser(username: string, password: string) {
     throw new Error("Invalid credentials");
   }
 
-  // Check if email is verified
-  if (!user.emailVerified) {
+  // Check if email is verified (skip in development for easier testing)
+  if (!user.emailVerified && process.env.NODE_ENV !== "development") {
     throw new Error("Please verify your email before logging in");
+  }
+  
+  // In development, auto-verify users on first login for easier testing
+  if (!user.emailVerified && process.env.NODE_ENV === "development") {
+    console.log(`[DEBUG] Auto-verifying ${user.email} in development mode`);
+    await storage.updateUser(user.id, { emailVerified: true });
   }
 
   // Update last login
