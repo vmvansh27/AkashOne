@@ -27,6 +27,8 @@ import {
   type InsertTeamMember,
   type DiscountCoupon,
   type InsertDiscountCoupon,
+  type UserActivity,
+  type InsertUserActivity,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -138,6 +140,13 @@ export interface IStorage {
   deleteDiscountCoupon(id: string): Promise<boolean>;
   incrementCouponUsage(id: string): Promise<void>;
   validateCoupon(code: string, orderAmount?: number): Promise<{ valid: boolean; error?: string; coupon?: DiscountCoupon }>;
+
+  // Activity Logging
+  getUserActivities(userId?: string, limit?: number): Promise<UserActivity[]>;
+  getUserActivity(id: string): Promise<UserActivity | undefined>;
+  createUserActivity(activity: InsertUserActivity): Promise<UserActivity>;
+  getRecentActivities(limit?: number): Promise<UserActivity[]>;
+  getUserActivitiesByAction(userId: string, action: string): Promise<UserActivity[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -155,6 +164,7 @@ export class MemStorage implements IStorage {
   private userRoles: Map<string, UserRole>;
   private teamMembers: Map<string, TeamMember>;
   private discountCoupons: Map<string, DiscountCoupon>;
+  private userActivities: Map<string, UserActivity>;
 
   constructor() {
     this.users = new Map();
@@ -171,6 +181,7 @@ export class MemStorage implements IStorage {
     this.userRoles = new Map();
     this.teamMembers = new Map();
     this.discountCoupons = new Map();
+    this.userActivities = new Map();
     
     // Initialize defaults
     this.initializeDefaultFeatureFlags();
@@ -203,8 +214,15 @@ export class MemStorage implements IStorage {
     const user: User = {
       ...insertUser,
       id,
+      emailVerified: false,
+      emailVerificationCode: null,
+      emailVerificationExpiry: null,
       twoFactorSecret: null,
-      twoFactorEnabled: null,
+      twoFactorEnabled: false,
+      accountType: "customer",
+      organizationId: null,
+      defaultDiscountPercentage: 0,
+      status: "active",
       createdAt: new Date(),
       lastLogin: null,
     };
@@ -710,6 +728,80 @@ export class MemStorage implements IStorage {
         icon: "TrendingUp",
         sortOrder: 16,
       },
+
+      // CloudStack Infrastructure Components (Initially disabled)
+      {
+        key: "volumes",
+        name: "Block Storage Volumes",
+        description: "Persistent block storage with attach/detach to VMs",
+        category: "Storage",
+        enabled: false,
+        icon: "HardDrive",
+        sortOrder: 17,
+      },
+      {
+        key: "firewall",
+        name: "Firewall Rules",
+        description: "Network firewall rules for ingress/egress traffic control",
+        category: "Networking",
+        enabled: false,
+        icon: "Shield",
+        sortOrder: 18,
+      },
+      {
+        key: "security_groups",
+        name: "Security Groups",
+        description: "VM security groups with customizable inbound/outbound rules",
+        category: "Networking",
+        enabled: false,
+        icon: "Lock",
+        sortOrder: 19,
+      },
+      {
+        key: "vpc",
+        name: "Virtual Private Cloud",
+        description: "Isolated VPC networks with custom CIDR and network tiers",
+        category: "Networking",
+        enabled: false,
+        icon: "Network",
+        sortOrder: 20,
+      },
+      {
+        key: "elastic_ip",
+        name: "Elastic IP (Static IP)",
+        description: "Reserve and manage static public IP addresses",
+        category: "Networking",
+        enabled: false,
+        icon: "MapPin",
+        sortOrder: 21,
+      },
+      {
+        key: "ssh_keys",
+        name: "SSH Key Management",
+        description: "Register and manage SSH key pairs for secure VM access",
+        category: "Compute",
+        enabled: false,
+        icon: "Key",
+        sortOrder: 22,
+      },
+      {
+        key: "images_templates",
+        name: "Images & Templates",
+        description: "VM templates, ISOs, and custom image management",
+        category: "Compute",
+        enabled: false,
+        icon: "Image",
+        sortOrder: 23,
+      },
+      {
+        key: "resource_tags",
+        name: "Resource Tags",
+        description: "Organize resources with key-value tags for billing and categorization",
+        category: "Compute",
+        enabled: false,
+        icon: "Tag",
+        sortOrder: 24,
+      },
     ];
 
     for (const flag of defaultFlags) {
@@ -1145,6 +1237,55 @@ export class MemStorage implements IStorage {
     }
 
     return { valid: true, coupon };
+  }
+
+  // Activity Logging Methods
+  async getUserActivities(userId?: string, limit?: number): Promise<UserActivity[]> {
+    let activities = Array.from(this.userActivities.values());
+    
+    if (userId) {
+      activities = activities.filter(a => a.userId === userId);
+    }
+    
+    activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    if (limit) {
+      activities = activities.slice(0, limit);
+    }
+    
+    return activities;
+  }
+
+  async getUserActivity(id: string): Promise<UserActivity | undefined> {
+    return this.userActivities.get(id);
+  }
+
+  async createUserActivity(activity: InsertUserActivity): Promise<UserActivity> {
+    const id = randomUUID();
+    const newActivity: UserActivity = {
+      ...activity,
+      id,
+      ipAddress: activity.ipAddress || null,
+      userAgent: activity.userAgent || null,
+      resourceType: activity.resourceType || null,
+      resourceId: activity.resourceId || null,
+      resourceName: activity.resourceName || null,
+      metadata: activity.metadata || null,
+      createdAt: new Date(),
+    };
+    
+    this.userActivities.set(id, newActivity);
+    return newActivity;
+  }
+
+  async getRecentActivities(limit: number = 100): Promise<UserActivity[]> {
+    return this.getUserActivities(undefined, limit);
+  }
+
+  async getUserActivitiesByAction(userId: string, action: string): Promise<UserActivity[]> {
+    return Array.from(this.userActivities.values())
+      .filter(a => a.userId === userId && a.action === action)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 }
 

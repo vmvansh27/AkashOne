@@ -1,4 +1,4 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp, Users, Tag, Percent } from "lucide-react";
+import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp, Users, Tag, Percent, Lock, MapPin, Key, Image } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -211,6 +211,57 @@ const superAdminItems: MenuItem[] = [
   },
 ];
 
+const cloudStackItems: MenuItem[] = [
+  {
+    title: "Block Storage",
+    url: "/volumes",
+    icon: HardDrive,
+    featureKey: "volumes",
+  },
+  {
+    title: "Firewall Rules",
+    url: "/firewall",
+    icon: Shield,
+    featureKey: "firewall",
+  },
+  {
+    title: "Security Groups",
+    url: "/security-groups",
+    icon: Lock,
+    featureKey: "security_groups",
+  },
+  {
+    title: "VPC",
+    url: "/vpc",
+    icon: Network,
+    featureKey: "vpc",
+  },
+  {
+    title: "Elastic IP",
+    url: "/elastic-ip",
+    icon: MapPin,
+    featureKey: "elastic_ip",
+  },
+  {
+    title: "SSH Keys",
+    url: "/ssh-keys",
+    icon: Key,
+    featureKey: "ssh_keys",
+  },
+  {
+    title: "Images & Templates",
+    url: "/images-templates",
+    icon: Image,
+    featureKey: "images_templates",
+  },
+  {
+    title: "Resource Tags",
+    url: "/resource-tags",
+    icon: Tag,
+    featureKey: "resource_tags",
+  },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
 
@@ -239,6 +290,7 @@ export function AppSidebar() {
   const visibleBillingItems = filterByFeature(billingItems);
   const visibleAdvancedComputeItems = filterByFeature(advancedComputeItems);
   const visibleNetworkingItems = filterByFeature(networkingItems);
+  const visibleCloudStackItems = filterByFeature(cloudStackItems);
 
   return (
     <Sidebar>
@@ -298,6 +350,26 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {visibleNetworkingItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url}>
+                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {visibleCloudStackItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Infrastructure</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleCloudStackItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={location === item.url}>
                       <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>

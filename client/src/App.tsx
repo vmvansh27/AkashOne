@@ -40,6 +40,14 @@ import RoleManagement from "@/pages/role-management";
 import UserDiscounts from "@/pages/user-discounts";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
+import Volumes from "@/pages/volumes";
+import Firewall from "@/pages/firewall";
+import SecurityGroups from "@/pages/security-groups";
+import VPC from "@/pages/vpc";
+import ElasticIP from "@/pages/elastic-ip";
+import SSHKeys from "@/pages/ssh-keys";
+import ImagesTemplates from "@/pages/images-templates";
+import ResourceTags from "@/pages/resource-tags";
 import { useQuery } from "@tanstack/react-query";
 
 function Router() {
@@ -93,6 +101,14 @@ function Router() {
       <Route path="/auto-scaling" component={AutoScaling} />
       <Route path="/team-management" component={TeamManagement} />
       <Route path="/role-management" component={RoleManagement} />
+      <Route path="/volumes" component={Volumes} />
+      <Route path="/firewall" component={Firewall} />
+      <Route path="/security-groups" component={SecurityGroups} />
+      <Route path="/vpc" component={VPC} />
+      <Route path="/elastic-ip" component={ElasticIP} />
+      <Route path="/ssh-keys" component={SSHKeys} />
+      <Route path="/images-templates" component={ImagesTemplates} />
+      <Route path="/resource-tags" component={ResourceTags} />
       <Route component={NotFound} />
     </Switch>
   );

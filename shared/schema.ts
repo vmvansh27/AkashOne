@@ -338,3 +338,26 @@ export type UserRole = typeof userRoles.$inferSelect;
 export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+
+// Activity Logging
+export const userActivities = pgTable("user_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  username: text("username").notNull(), // Denormalized for reporting
+  action: text("action").notNull(), // "login", "vm.create", "vm.delete", "vm.start", "vm.stop", etc.
+  resourceType: text("resource_type"), // "vm", "kubernetes", "database", etc.
+  resourceId: varchar("resource_id"), // ID of the resource
+  resourceName: text("resource_name"), // Name of the resource for display
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: jsonb("metadata"), // Additional context (e.g., VM specs, region, etc.)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertUserActivitySchema = createInsertSchema(userActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type UserActivity = typeof userActivities.$inferSelect;
+export type InsertUserActivity = z.infer<typeof insertUserActivitySchema>;
