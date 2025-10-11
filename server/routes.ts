@@ -46,13 +46,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register endpoint
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { username, email, password } = req.body;
+      const { username, email, password, gstNumber } = req.body;
 
-      if (!username || !email || !password) {
+      if (!username || !email || !password || !gstNumber) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      await registerUser(username, email, password);
+      await registerUser(username, email, password, gstNumber);
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -74,6 +74,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(result);
       } else {
         req.session.userId = result.user?.id;
+        
+        // Log successful login
+        if (result.user) {
+          await storage.createUserActivity({
+            userId: result.user.id,
+            username: result.user.username,
+            action: "login",
+            resourceType: null,
+            resourceId: null,
+            resourceName: null,
+            ipAddress: req.ip || null,
+            userAgent: req.headers["user-agent"] || null,
+            metadata: { loginMethod: "password" },
+          });
+        }
+        
         res.json(result);
       }
     } catch (error: any) {
@@ -92,6 +108,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await verifyTwoFactor(sessionToken, twoFactorCode);
       req.session.userId = result.user.id;
+      
+      // Log successful 2FA login
+      await storage.createUserActivity({
+        userId: result.user.id,
+        username: result.user.username,
+        action: "login",
+        resourceType: null,
+        resourceId: null,
+        resourceName: null,
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+        metadata: { loginMethod: "2fa" },
+      });
+      
       res.json(result);
     } catch (error: any) {
       res.status(401).json({ message: error.message });
@@ -687,6 +717,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.session.userId,
       });
 
+      // Log VM creation activity
+      const user = await storage.getUser(req.session.userId);
+      if (user) {
+        await storage.createUserActivity({
+          userId: user.id,
+          username: user.username,
+          action: "vm.create",
+          resourceType: "vm",
+          resourceId: vm.id,
+          resourceName: vm.displayName,
+          ipAddress: req.ip || null,
+          userAgent: req.headers["user-agent"] || null,
+          metadata: {
+            cpu: vm.cpu,
+            memory: vm.memory,
+            templateName: vm.templateName,
+            zoneName: vm.zoneName,
+          },
+        });
+      }
+
       res.json(vm);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -726,6 +777,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }) || vm;
       }
 
+      // Log VM start activity
+      const user = await storage.getUser(req.session.userId);
+      if (user) {
+        await storage.createUserActivity({
+          userId: user.id,
+          username: user.username,
+          action: "vm.start",
+          resourceType: "vm",
+          resourceId: updatedVM.id,
+          resourceName: updatedVM.displayName,
+          ipAddress: req.ip || null,
+          userAgent: req.headers["user-agent"] || null,
+          metadata: { state: updatedVM.state },
+        });
+      }
+
       res.json(updatedVM);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -760,6 +827,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let updatedVM = vm;
       if (vmData) {
         updatedVM = await storage.updateVirtualMachine(id, { state: vmData.state }) || vm;
+      }
+
+      // Log VM stop activity
+      const user = await storage.getUser(req.session.userId);
+      if (user) {
+        await storage.createUserActivity({
+          userId: user.id,
+          username: user.username,
+          action: "vm.stop",
+          resourceType: "vm",
+          resourceId: updatedVM.id,
+          resourceName: updatedVM.displayName,
+          ipAddress: req.ip || null,
+          userAgent: req.headers["user-agent"] || null,
+          metadata: { state: updatedVM.state },
+        });
       }
 
       res.json(updatedVM);
@@ -798,6 +881,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedVM = await storage.updateVirtualMachine(id, { state: vmData.state }) || vm;
       }
 
+      // Log VM reboot activity
+      const user = await storage.getUser(req.session.userId);
+      if (user) {
+        await storage.createUserActivity({
+          userId: user.id,
+          username: user.username,
+          action: "vm.reboot",
+          resourceType: "vm",
+          resourceId: updatedVM.id,
+          resourceName: updatedVM.displayName,
+          ipAddress: req.ip || null,
+          userAgent: req.headers["user-agent"] || null,
+          metadata: { state: updatedVM.state },
+        });
+      }
+
       res.json(updatedVM);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -820,6 +919,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (vm.userId !== req.session.userId) {
         return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Log VM delete activity before deletion
+      const user = await storage.getUser(req.session.userId);
+      if (user) {
+        await storage.createUserActivity({
+          userId: user.id,
+          username: user.username,
+          action: "vm.delete",
+          resourceType: "vm",
+          resourceId: vm.id,
+          resourceName: vm.displayName,
+          ipAddress: req.ip || null,
+          userAgent: req.headers["user-agent"] || null,
+          metadata: {
+            cloudstackId: vm.cloudstackId,
+            zoneName: vm.zoneName,
+          },
+        });
       }
 
       // Call CloudStack API (polls async job until complete)
@@ -1038,6 +1156,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updatedFlag);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===================================
+  // Activity Logging
+  // ===================================
+
+  // Create activity log
+  app.post("/api/activity-logs", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { action, resourceType, resourceId, metadata } = req.body;
+      
+      if (!action || !resourceType) {
+        return res.status(400).json({ message: "Missing required fields: action and resourceType" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const activity = await storage.createUserActivity({
+        userId: req.session.userId,
+        username: user.username,
+        action,
+        resourceType: resourceType || null,
+        resourceId: resourceId || null,
+        resourceName: null,
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+        metadata: metadata || null,
+      });
+
+      res.json(activity);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get activity logs (with optional user filtering)
+  app.get("/api/activity-logs", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { userId } = req.query;
+      
+      // If userId is provided, filter by that user
+      // Otherwise, return all activities (for admin view)
+      let activities;
+      
+      if (userId && typeof userId === "string") {
+        activities = await storage.getUserActivities(userId);
+      } else {
+        // Call getUserActivities without parameters to get all activities
+        activities = await storage.getUserActivities();
+      }
+
+      res.json(activities);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

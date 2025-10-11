@@ -48,6 +48,7 @@ import ElasticIP from "@/pages/elastic-ip";
 import SSHKeys from "@/pages/ssh-keys";
 import ImagesTemplates from "@/pages/images-templates";
 import ResourceTags from "@/pages/resource-tags";
+import ActivityLogs from "@/pages/activity-logs";
 import { useQuery } from "@tanstack/react-query";
 
 function Router() {
@@ -109,6 +110,7 @@ function Router() {
       <Route path="/ssh-keys" component={SSHKeys} />
       <Route path="/images-templates" component={ImagesTemplates} />
       <Route path="/resource-tags" component={ResourceTags} />
+      <Route path="/activity-logs" component={ActivityLogs} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -154,6 +154,11 @@ const adminItems: MenuItem[] = [
     icon: Shield,
   },
   {
+    title: "Activity Logs",
+    url: "/activity-logs",
+    icon: BarChart3,
+  },
+  {
     title: "Security",
     url: "/security",
     icon: Shield,
