@@ -353,7 +353,7 @@ export default function VirtualMachines() {
                   name="zoneId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Zone</FormLabel>
+                      <FormLabel>Region / Zone</FormLabel>
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value);
@@ -365,13 +365,23 @@ export default function VirtualMachines() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-zone">
-                            <SelectValue placeholder="Select a zone" />
+                            <SelectValue placeholder="Select region / zone" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          {zones.length === 0 && (
+                            <div className="px-2 py-3 text-sm text-muted-foreground">
+                              No zones available. Please configure CloudStack API.
+                            </div>
+                          )}
                           {zones.map((zone: any) => (
                             <SelectItem key={zone.id} value={zone.id}>
-                              {zone.name}
+                              <div className="flex flex-col">
+                                <span className="font-medium">{zone.name}</span>
+                                {zone.description && (
+                                  <span className="text-xs text-muted-foreground">{zone.description}</span>
+                                )}
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -386,7 +396,7 @@ export default function VirtualMachines() {
                   name="templateId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Template</FormLabel>
+                      <FormLabel>Operating System Template</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-template">
@@ -394,9 +404,25 @@ export default function VirtualMachines() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          {!selectedZone && (
+                            <div className="px-2 py-3 text-sm text-muted-foreground">
+                              Please select a region/zone first
+                            </div>
+                          )}
+                          {selectedZone && templates.length === 0 && (
+                            <div className="px-2 py-3 text-sm text-muted-foreground">
+                              No templates available for this zone
+                            </div>
+                          )}
                           {templates.map((template: any) => (
                             <SelectItem key={template.id} value={template.id}>
-                              {template.name}
+                              <div className="flex flex-col">
+                                <span className="font-medium">{template.name}</span>
+                                <div className="flex gap-2 text-xs text-muted-foreground">
+                                  {template.ostypename && <span>{template.ostypename}</span>}
+                                  {template.size && <span>• {(template.size / (1024**3)).toFixed(1)} GB</span>}
+                                </div>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -411,17 +437,35 @@ export default function VirtualMachines() {
                   name="serviceOfferingId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Service Offering</FormLabel>
+                      <FormLabel>Machine Configuration (CPU, RAM, Storage)</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-service-offering">
-                            <SelectValue placeholder="Select compute plan" />
+                            <SelectValue placeholder="Select machine configuration" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          {serviceOfferings.length === 0 && (
+                            <div className="px-2 py-3 text-sm text-muted-foreground">
+                              No service offerings available
+                            </div>
+                          )}
                           {serviceOfferings.map((offering: any) => (
                             <SelectItem key={offering.id} value={offering.id}>
-                              {offering.name} ({offering.cpunumber} CPU, {offering.memory}MB RAM)
+                              <div className="flex flex-col">
+                                <span className="font-medium">{offering.name || offering.displaytext}</span>
+                                <div className="flex gap-2 text-xs text-muted-foreground">
+                                  <span>{offering.cpunumber} vCPU</span>
+                                  <span>•</span>
+                                  <span>{(offering.memory / 1024).toFixed(1)} GB RAM</span>
+                                  {offering.diskBytesReadRate && (
+                                    <>
+                                      <span>•</span>
+                                      <span>Disk I/O Optimized</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
