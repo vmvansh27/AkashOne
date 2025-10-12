@@ -47,6 +47,16 @@ import {
   type InsertReservedIp,
   type IpsecTunnel,
   type InsertIpsecTunnel,
+  type LoadBalancer,
+  type InsertLoadBalancer,
+  type SslCertificate,
+  type InsertSslCertificate,
+  type ObjectStorageBucket,
+  type InsertObjectStorageBucket,
+  type DdosProtectionRule,
+  type InsertDdosProtectionRule,
+  type CdnDistribution,
+  type InsertCdnDistribution,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -238,6 +248,36 @@ export interface IStorage {
   createIpsecTunnel(tunnel: InsertIpsecTunnel & { userId: string }): Promise<IpsecTunnel>;
   updateIpsecTunnel(id: string, data: Partial<IpsecTunnel>): Promise<IpsecTunnel | undefined>;
   deleteIpsecTunnel(id: string): Promise<boolean>;
+
+  // Load Balancers
+  getLoadBalancers(userId: string): Promise<LoadBalancer[]>;
+  getLoadBalancer(id: string): Promise<LoadBalancer | undefined>;
+  createLoadBalancer(lb: InsertLoadBalancer & { userId: string }): Promise<LoadBalancer>;
+  deleteLoadBalancer(id: string): Promise<boolean>;
+
+  // SSL Certificates
+  getSslCertificates(userId: string): Promise<SslCertificate[]>;
+  getSslCertificate(id: string): Promise<SslCertificate | undefined>;
+  createSslCertificate(cert: InsertSslCertificate & { userId: string }): Promise<SslCertificate>;
+  deleteSslCertificate(id: string): Promise<boolean>;
+
+  // Object Storage Buckets
+  getObjectStorageBuckets(userId: string): Promise<ObjectStorageBucket[]>;
+  getObjectStorageBucket(id: string): Promise<ObjectStorageBucket | undefined>;
+  createObjectStorageBucket(bucket: InsertObjectStorageBucket & { userId: string }): Promise<ObjectStorageBucket>;
+  deleteObjectStorageBucket(id: string): Promise<boolean>;
+
+  // DDoS Protection Rules
+  getDdosProtectionRules(userId: string): Promise<DdosProtectionRule[]>;
+  getDdosProtectionRule(id: string): Promise<DdosProtectionRule | undefined>;
+  createDdosProtectionRule(rule: InsertDdosProtectionRule & { userId: string }): Promise<DdosProtectionRule>;
+  deleteDdosProtectionRule(id: string): Promise<boolean>;
+
+  // CDN Distributions
+  getCdnDistributions(userId: string): Promise<CdnDistribution[]>;
+  getCdnDistribution(id: string): Promise<CdnDistribution | undefined>;
+  createCdnDistribution(dist: InsertCdnDistribution & { userId: string }): Promise<CdnDistribution>;
+  deleteCdnDistribution(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -265,6 +305,11 @@ export class MemStorage implements IStorage {
   private isoImages: Map<string, IsoImage>;
   private reservedIps: Map<string, ReservedIp>;
   private ipsecTunnels: Map<string, IpsecTunnel>;
+  private loadBalancers: Map<string, LoadBalancer>;
+  private sslCertificates: Map<string, SslCertificate>;
+  private objectStorageBuckets: Map<string, ObjectStorageBucket>;
+  private ddosProtectionRules: Map<string, DdosProtectionRule>;
+  private cdnDistributions: Map<string, CdnDistribution>;
 
   constructor() {
     this.users = new Map();
@@ -291,6 +336,11 @@ export class MemStorage implements IStorage {
     this.isoImages = new Map();
     this.reservedIps = new Map();
     this.ipsecTunnels = new Map();
+    this.loadBalancers = new Map();
+    this.sslCertificates = new Map();
+    this.objectStorageBuckets = new Map();
+    this.ddosProtectionRules = new Map();
+    this.cdnDistributions = new Map();
     
     // Initialize defaults
     this.initializeDefaultFeatureFlags();
@@ -1992,6 +2042,161 @@ export class MemStorage implements IStorage {
 
   async deleteIpsecTunnel(id: string): Promise<boolean> {
     return this.ipsecTunnels.delete(id);
+  }
+
+  // Load Balancers
+  async getLoadBalancers(userId: string): Promise<LoadBalancer[]> {
+    return Array.from(this.loadBalancers.values()).filter(lb => lb.userId === userId);
+  }
+
+  async getLoadBalancer(id: string): Promise<LoadBalancer | undefined> {
+    return this.loadBalancers.get(id);
+  }
+
+  async createLoadBalancer(lb: InsertLoadBalancer & { userId: string }): Promise<LoadBalancer> {
+    const id = randomUUID();
+    const newLb: LoadBalancer = {
+      algorithm: "roundrobin",
+      state: "Active",
+      stickiness: false,
+      healthCheck: true,
+      healthCheckPath: "/",
+      healthCheckInterval: 30,
+      networkId: null,
+      vpcId: null,
+      tags: null,
+      ...lb,
+      id,
+      createdAt: new Date(),
+    };
+    this.loadBalancers.set(id, newLb);
+    return newLb;
+  }
+
+  async deleteLoadBalancer(id: string): Promise<boolean> {
+    return this.loadBalancers.delete(id);
+  }
+
+  // SSL Certificates
+  async getSslCertificates(userId: string): Promise<SslCertificate[]> {
+    return Array.from(this.sslCertificates.values()).filter(cert => cert.userId === userId);
+  }
+
+  async getSslCertificate(id: string): Promise<SslCertificate | undefined> {
+    return this.sslCertificates.get(id);
+  }
+
+  async createSslCertificate(cert: InsertSslCertificate & { userId: string }): Promise<SslCertificate> {
+    const id = randomUUID();
+    const newCert: SslCertificate = {
+      chain: null,
+      issuer: null,
+      status: "Active",
+      autoRenew: false,
+      tags: null,
+      ...cert,
+      id,
+      createdAt: new Date(),
+    };
+    this.sslCertificates.set(id, newCert);
+    return newCert;
+  }
+
+  async deleteSslCertificate(id: string): Promise<boolean> {
+    return this.sslCertificates.delete(id);
+  }
+
+  // Object Storage Buckets
+  async getObjectStorageBuckets(userId: string): Promise<ObjectStorageBucket[]> {
+    return Array.from(this.objectStorageBuckets.values()).filter(bucket => bucket.userId === userId);
+  }
+
+  async getObjectStorageBucket(id: string): Promise<ObjectStorageBucket | undefined> {
+    return this.objectStorageBuckets.get(id);
+  }
+
+  async createObjectStorageBucket(bucket: InsertObjectStorageBucket & { userId: string }): Promise<ObjectStorageBucket> {
+    const id = randomUUID();
+    const newBucket: ObjectStorageBucket = {
+      versioning: false,
+      publicAccess: false,
+      encryption: true,
+      size: 0,
+      objectCount: 0,
+      tags: null,
+      ...bucket,
+      id,
+      createdAt: new Date(),
+    };
+    this.objectStorageBuckets.set(id, newBucket);
+    return newBucket;
+  }
+
+  async deleteObjectStorageBucket(id: string): Promise<boolean> {
+    return this.objectStorageBuckets.delete(id);
+  }
+
+  // DDoS Protection Rules
+  async getDdosProtectionRules(userId: string): Promise<DdosProtectionRule[]> {
+    return Array.from(this.ddosProtectionRules.values()).filter(rule => rule.userId === userId);
+  }
+
+  async getDdosProtectionRule(id: string): Promise<DdosProtectionRule | undefined> {
+    return this.ddosProtectionRules.get(id);
+  }
+
+  async createDdosProtectionRule(rule: InsertDdosProtectionRule & { userId: string }): Promise<DdosProtectionRule> {
+    const id = randomUUID();
+    const newRule: DdosProtectionRule = {
+      protectionLevel: "standard",
+      enabled: true,
+      trafficThreshold: 1000,
+      packetThreshold: 100000,
+      autoMitigation: true,
+      tags: null,
+      ...rule,
+      id,
+      createdAt: new Date(),
+    };
+    this.ddosProtectionRules.set(id, newRule);
+    return newRule;
+  }
+
+  async deleteDdosProtectionRule(id: string): Promise<boolean> {
+    return this.ddosProtectionRules.delete(id);
+  }
+
+  // CDN Distributions
+  async getCdnDistributions(userId: string): Promise<CdnDistribution[]> {
+    return Array.from(this.cdnDistributions.values()).filter(dist => dist.userId === userId);
+  }
+
+  async getCdnDistribution(id: string): Promise<CdnDistribution | undefined> {
+    return this.cdnDistributions.get(id);
+  }
+
+  async createCdnDistribution(dist: InsertCdnDistribution & { userId: string }): Promise<CdnDistribution> {
+    const id = randomUUID();
+    const newDist: CdnDistribution = {
+      originProtocol: "https",
+      status: "Enabled",
+      cacheEnabled: true,
+      cacheTtl: 3600,
+      compressionEnabled: true,
+      sslEnabled: true,
+      sslCertificateId: null,
+      geoRestrictions: [],
+      tags: null,
+      ...dist,
+      id,
+      createdAt: new Date(),
+    };
+    this.cdnDistributions.set(id, newDist);
+    return newDist;
+  }
+
+  async deleteCdnDistribution(id: string): Promise<boolean> {
+    return this.cdnDistributions.delete(id);
   }
 }
 

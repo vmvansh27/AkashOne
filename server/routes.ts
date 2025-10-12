@@ -12,7 +12,22 @@ import {
   disableTwoFactor,
 } from "./auth";
 import { createFeatureFlagMiddleware } from "./middleware/feature-flags";
-import { insertDiscountCouponSchema, insertVolumeSchema, insertVpcSchema } from "@shared/schema";
+import { 
+  insertDiscountCouponSchema, 
+  insertVolumeSchema, 
+  insertVpcSchema, 
+  insertFirewallRuleSchema, 
+  insertNatGatewaySchema, 
+  insertSshKeySchema, 
+  insertIsoImageSchema, 
+  insertReservedIpSchema, 
+  insertIpsecTunnelSchema,
+  insertLoadBalancerSchema,
+  insertSslCertificateSchema,
+  insertObjectStorageBucketSchema,
+  insertDdosProtectionRuleSchema,
+  insertCdnDistributionSchema
+} from "@shared/schema";
 
 declare module "express-session" {
   interface SessionData {
@@ -2169,6 +2184,689 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.deleteVpc(req.params.id);
       res.json({ message: "VPC deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Firewall Rules
+  app.get("/api/firewall-rules", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const rules = await storage.getFirewallRules(req.session.userId);
+      res.json(rules);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/firewall-rules/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const rule = await storage.getFirewallRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ message: "Firewall rule not found" });
+      }
+      if (rule.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+      res.json(rule);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/firewall-rules", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertFirewallRuleSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      // In production, cloudstackId would come from CloudStack API response
+      // For now, generate a unique ID (this will be replaced when CloudStack integration is active)
+      const cloudstackId = `fw-${randomUUID().split('-')[0]}`;
+      const rule = await storage.createFirewallRule({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(rule);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/firewall-rules/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const rule = await storage.getFirewallRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ message: "Firewall rule not found" });
+      }
+      if (rule.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Exclude protected/immutable fields from updates
+      const validatedData = insertFirewallRuleSchema.partial().omit({
+        userId: true,
+        cloudstackId: true,
+      }).parse(req.body);
+      
+      const updated = await storage.updateFirewallRule(req.params.id, validatedData);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/firewall-rules/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const rule = await storage.getFirewallRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ message: "Firewall rule not found" });
+      }
+      if (rule.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteFirewallRule(req.params.id);
+      res.json({ message: "Firewall rule deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // NAT Gateways
+  app.get("/api/nat-gateways", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const gateways = await storage.getNatGateways(req.session.userId);
+      res.json(gateways);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/nat-gateways", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertNatGatewaySchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `nat-${randomUUID().split('-')[0]}`;
+      const gateway = await storage.createNatGateway({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(gateway);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/nat-gateways/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const gateway = await storage.getNatGateway(req.params.id);
+      if (!gateway) {
+        return res.status(404).json({ message: "NAT gateway not found" });
+      }
+      if (gateway.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteNatGateway(req.params.id);
+      res.json({ message: "NAT gateway deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // SSH Keys
+  app.get("/api/ssh-keys", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const keys = await storage.getSshKeys(req.session.userId);
+      res.json(keys);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/ssh-keys", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertSshKeySchema.omit({ userId: true }).parse(req.body);
+      const key = await storage.createSshKey({
+        ...validatedData,
+        userId: req.session.userId,
+      });
+      res.status(201).json(key);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/ssh-keys/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const key = await storage.getSshKey(req.params.id);
+      if (!key) {
+        return res.status(404).json({ message: "SSH key not found" });
+      }
+      if (key.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteSshKey(req.params.id);
+      res.json({ message: "SSH key deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ISO Images
+  app.get("/api/iso-images", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const images = await storage.getIsoImages(req.session.userId);
+      res.json(images);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/iso-images", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertIsoImageSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `iso-${randomUUID().split('-')[0]}`;
+      const image = await storage.createIsoImage({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(image);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/iso-images/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const image = await storage.getIsoImage(req.params.id);
+      if (!image) {
+        return res.status(404).json({ message: "ISO image not found" });
+      }
+      if (image.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteIsoImage(req.params.id);
+      res.json({ message: "ISO image deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reserved IPs
+  app.get("/api/reserved-ips", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const ips = await storage.getReservedIps(req.session.userId);
+      res.json(ips);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/reserved-ips", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertReservedIpSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `ip-${randomUUID().split('-')[0]}`;
+      const ip = await storage.createReservedIp({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(ip);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/reserved-ips/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const ip = await storage.getReservedIp(req.params.id);
+      if (!ip) {
+        return res.status(404).json({ message: "Reserved IP not found" });
+      }
+      if (ip.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteReservedIp(req.params.id);
+      res.json({ message: "Reserved IP deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // IPsec Tunnels
+  app.get("/api/ipsec-tunnels", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const tunnels = await storage.getIpsecTunnels(req.session.userId);
+      res.json(tunnels);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/ipsec-tunnels", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertIpsecTunnelSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `vpn-${randomUUID().split('-')[0]}`;
+      const tunnel = await storage.createIpsecTunnel({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(tunnel);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/ipsec-tunnels/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const tunnel = await storage.getIpsecTunnel(req.params.id);
+      if (!tunnel) {
+        return res.status(404).json({ message: "IPsec tunnel not found" });
+      }
+      if (tunnel.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteIpsecTunnel(req.params.id);
+      res.json({ message: "IPsec tunnel deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Load Balancers
+  app.get("/api/load-balancers", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const loadBalancers = await storage.getLoadBalancers(req.session.userId);
+      res.json(loadBalancers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/load-balancers", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertLoadBalancerSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `lb-${randomUUID().split('-')[0]}`;
+      const loadBalancer = await storage.createLoadBalancer({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(loadBalancer);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/load-balancers/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const loadBalancer = await storage.getLoadBalancer(req.params.id);
+      if (!loadBalancer) {
+        return res.status(404).json({ message: "Load balancer not found" });
+      }
+      if (loadBalancer.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteLoadBalancer(req.params.id);
+      res.json({ message: "Load balancer deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // SSL Certificates
+  app.get("/api/ssl-certificates", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const certificates = await storage.getSslCertificates(req.session.userId);
+      res.json(certificates);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/ssl-certificates", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertSslCertificateSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `ssl-${randomUUID().split('-')[0]}`;
+      const certificate = await storage.createSslCertificate({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(certificate);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/ssl-certificates/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const certificate = await storage.getSslCertificate(req.params.id);
+      if (!certificate) {
+        return res.status(404).json({ message: "SSL certificate not found" });
+      }
+      if (certificate.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteSslCertificate(req.params.id);
+      res.json({ message: "SSL certificate deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Object Storage
+  app.get("/api/object-storage", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const buckets = await storage.getObjectStorageBuckets(req.session.userId);
+      res.json(buckets);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/object-storage", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertObjectStorageBucketSchema.omit({ userId: true, cloudstackId: true, accessKey: true, secretKey: true, endpoint: true }).parse(req.body);
+      const cloudstackId = `s3-${randomUUID().split('-')[0]}`;
+      const accessKey = `AK${randomUUID().replace(/-/g, '').substring(0, 20).toUpperCase()}`;
+      const secretKey = randomUUID() + randomUUID();
+      const endpoint = `https://${validatedData.name}.s3.${validatedData.region}.akashone.com`;
+      
+      const bucket = await storage.createObjectStorageBucket({
+        ...validatedData,
+        cloudstackId,
+        accessKey,
+        secretKey,
+        endpoint,
+        userId: req.session.userId,
+      });
+      res.status(201).json(bucket);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/object-storage/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const bucket = await storage.getObjectStorageBucket(req.params.id);
+      if (!bucket) {
+        return res.status(404).json({ message: "Object storage bucket not found" });
+      }
+      if (bucket.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteObjectStorageBucket(req.params.id);
+      res.json({ message: "Object storage bucket deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DDoS Protection
+  app.get("/api/ddos-protection", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const rules = await storage.getDdosProtectionRules(req.session.userId);
+      res.json(rules);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/ddos-protection", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertDdosProtectionRuleSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `ddos-${randomUUID().split('-')[0]}`;
+      const rule = await storage.createDdosProtectionRule({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(rule);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/ddos-protection/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const rule = await storage.getDdosProtectionRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ message: "DDoS protection rule not found" });
+      }
+      if (rule.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteDdosProtectionRule(req.params.id);
+      res.json({ message: "DDoS protection rule deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // CDN Distributions
+  app.get("/api/cdn-distributions", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const distributions = await storage.getCdnDistributions(req.session.userId);
+      res.json(distributions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cdn-distributions", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertCdnDistributionSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      const cloudstackId = `cdn-${randomUUID().split('-')[0]}`;
+      const distribution = await storage.createCdnDistribution({
+        ...validatedData,
+        cloudstackId,
+        userId: req.session.userId,
+      });
+      res.status(201).json(distribution);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cdn-distributions/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const distribution = await storage.getCdnDistribution(req.params.id);
+      if (!distribution) {
+        return res.status(404).json({ message: "CDN distribution not found" });
+      }
+      if (distribution.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteCdnDistribution(req.params.id);
+      res.json({ message: "CDN distribution deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

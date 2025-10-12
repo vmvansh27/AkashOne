@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, integer, jsonb, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -610,3 +610,140 @@ export const insertIpsecTunnelSchema = createInsertSchema(ipsecTunnels).omit({
 
 export type IpsecTunnel = typeof ipsecTunnels.$inferSelect;
 export type InsertIpsecTunnel = z.infer<typeof insertIpsecTunnelSchema>;
+
+// Load Balancers
+export const loadBalancers = pgTable("load_balancers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  algorithm: text("algorithm").notNull().default("roundrobin"), // roundrobin, leastconn, source
+  protocol: text("protocol").notNull(), // tcp, udp, http, https
+  publicPort: integer("public_port").notNull(),
+  privatePort: integer("private_port").notNull(),
+  publicIpId: varchar("public_ip_id").notNull(),
+  publicIp: text("public_ip").notNull(),
+  networkId: varchar("network_id"),
+  vpcId: varchar("vpc_id"),
+  state: text("state").notNull().default("Active"), // Active, Inactive
+  stickiness: boolean("stickiness").default(false),
+  healthCheck: boolean("health_check").default(true),
+  healthCheckPath: text("health_check_path").default("/"),
+  healthCheckInterval: integer("health_check_interval").default(30),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertLoadBalancerSchema = createInsertSchema(loadBalancers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type LoadBalancer = typeof loadBalancers.$inferSelect;
+export type InsertLoadBalancer = z.infer<typeof insertLoadBalancerSchema>;
+
+// SSL Certificates
+export const sslCertificates = pgTable("ssl_certificates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  domain: text("domain").notNull(),
+  certificate: text("certificate").notNull(), // PEM format
+  privateKey: text("private_key").notNull(), // PEM format
+  chain: text("chain"), // Certificate chain
+  issuer: text("issuer"),
+  expiresAt: timestamp("expires_at").notNull(),
+  status: text("status").notNull().default("Active"), // Active, Expired, Revoked
+  autoRenew: boolean("auto_renew").default(false),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertSslCertificateSchema = createInsertSchema(sslCertificates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SslCertificate = typeof sslCertificates.$inferSelect;
+export type InsertSslCertificate = z.infer<typeof insertSslCertificateSchema>;
+
+// Object Storage (S3-compatible)
+export const objectStorageBuckets = pgTable("object_storage_buckets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull().unique(),
+  region: text("region").notNull(),
+  accessKey: text("access_key").notNull(),
+  secretKey: text("secret_key").notNull(),
+  endpoint: text("endpoint").notNull(),
+  versioning: boolean("versioning").default(false),
+  publicAccess: boolean("public_access").default(false),
+  encryption: boolean("encryption").default(true),
+  size: bigint("size", { mode: "number" }).default(0), // bytes
+  objectCount: integer("object_count").default(0),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertObjectStorageBucketSchema = createInsertSchema(objectStorageBuckets).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ObjectStorageBucket = typeof objectStorageBuckets.$inferSelect;
+export type InsertObjectStorageBucket = z.infer<typeof insertObjectStorageBucketSchema>;
+
+// DDoS Protection
+export const ddosProtectionRules = pgTable("ddos_protection_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  ipAddressId: varchar("ip_address_id").notNull(),
+  ipAddress: text("ip_address").notNull(),
+  protectionLevel: text("protection_level").notNull().default("standard"), // standard, advanced, premium
+  enabled: boolean("enabled").default(true),
+  trafficThreshold: integer("traffic_threshold").default(1000), // Mbps
+  packetThreshold: integer("packet_threshold").default(100000), // packets per second
+  autoMitigation: boolean("auto_mitigation").default(true),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertDdosProtectionRuleSchema = createInsertSchema(ddosProtectionRules).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DdosProtectionRule = typeof ddosProtectionRules.$inferSelect;
+export type InsertDdosProtectionRule = z.infer<typeof insertDdosProtectionRuleSchema>;
+
+// CDN Distributions
+export const cdnDistributions = pgTable("cdn_distributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  domain: text("domain").notNull(),
+  originServer: text("origin_server").notNull(),
+  originProtocol: text("origin_protocol").notNull().default("https"), // http, https
+  status: text("status").notNull().default("Enabled"), // Enabled, Disabled, Deploying
+  cacheEnabled: boolean("cache_enabled").default(true),
+  cacheTtl: integer("cache_ttl").default(3600), // seconds
+  compressionEnabled: boolean("compression_enabled").default(true),
+  sslEnabled: boolean("ssl_enabled").default(true),
+  sslCertificateId: varchar("ssl_certificate_id"),
+  geoRestrictions: text("geo_restrictions").array().default(sql`ARRAY[]::text[]`),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertCdnDistributionSchema = createInsertSchema(cdnDistributions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CdnDistribution = typeof cdnDistributions.$inferSelect;
+export type InsertCdnDistribution = z.infer<typeof insertCdnDistributionSchema>;
