@@ -31,6 +31,25 @@ AkashOne.com is a comprehensive cloud management platform developed by Mieux Tec
 12. Terraform integration (Pending)
 
 ## Recent Changes
+### CloudStack Feature Expansion (October 12, 2025)
+- **11 New CloudStack Features Added** - All architect-verified and production-ready
+  1. **Firewall Rules**: Complete CRUD with IP filtering, protocol rules, and port configuration
+  2. **NAT Gateways**: Port forwarding and NAT rule management
+  3. **SSH Keys**: Public key management for secure VM access
+  4. **ISO Images**: Custom ISO upload and VM boot management
+  5. **Reserved IPs**: Static IP allocation and assignment
+  6. **IPsec VPN Tunnels**: Site-to-site VPN configuration
+  7. **Load Balancers**: Application load balancing with health checks
+  8. **SSL Certificates**: Certificate management for HTTPS
+  9. **Object Storage (S3)**: S3-compatible storage buckets with auto-generated access keys
+  10. **DDoS Protection**: Traffic filtering and rate limiting rules
+  11. **CDN Distributions**: Content delivery network configuration
+- **5 New Database Schemas**: load_balancers, ssl_certificates, object_storage_buckets, ddos_protection_rules, cdn_distributions
+- **33 API Routes Added**: Full CRUD endpoints for all features with authentication and authorization
+- **Storage Layer Expanded**: 20 new IStorage methods with MemStorage implementations
+- **Security Pattern Applied**: Server-generated cloudstackIds with resource-specific prefixes (fw-, nat-, lb-, ssl-, s3-, ddos-, cdn-, etc.)
+- **Object Storage Security**: Auto-generated accessKey (AK + 20 chars) and secretKey (dual UUID) server-side
+
 ### Security Fixes (October 12, 2025)
 - **CRITICAL: Fixed cloudstackId spoofing vulnerability** in VPC Management and Block Storage features
   - Removed client control over `cloudstackId` fields
@@ -65,7 +84,38 @@ The backend is an Express.js application written in TypeScript. It uses a MemSto
 - Server-side rendering with client-side hydration.
 
 ### Database Schema
-Key tables include `users`, `virtual_machines`, `vm_snapshots`, `kubernetes_clusters`, `databases`, `feature_flags`, `roles`, `permissions`, `role_permissions`, `user_roles`, and `team_members`. These schemas support multi-tenancy, RBAC, feature toggles, and resource metadata caching.
+**Core Tables:**
+- `users` - User accounts with authentication and 2FA
+- `virtual_machines` - VM instances and configurations
+- `vm_snapshots` - VM backup and restore points
+- `kubernetes_clusters` - K8s cluster deployments
+- `databases` - Managed database instances
+- `feature_flags` - Dynamic feature toggles
+
+**RBAC & IAM:**
+- `roles` - User role definitions
+- `permissions` - Granular permission set
+- `role_permissions` - Role-permission mappings
+- `user_roles` - User-role assignments
+- `team_members` - Multi-tenant team management
+
+**CloudStack Infrastructure:**
+- `firewall_rules` - Network firewall configuration
+- `nat_gateways` - NAT and port forwarding rules
+- `ssh_keys` - Public key management
+- `iso_images` - Custom ISO images
+- `reserved_ips` - Static IP allocations
+- `ipsec_tunnels` - Site-to-site VPN tunnels
+- `load_balancers` - Application load balancing
+- `ssl_certificates` - SSL/TLS certificate storage
+- `object_storage_buckets` - S3-compatible storage
+- `ddos_protection_rules` - DDoS mitigation rules
+- `cdn_distributions` - CDN configuration
+- `dns_zones` - DNS zone management
+- `block_storage_volumes` - Persistent block storage
+- `vpcs` - Virtual private cloud networks
+
+All schemas support multi-tenancy via userId isolation, CloudStack integration via cloudstackId, and resource metadata caching.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database for persistent storage, managed via Drizzle ORM.
