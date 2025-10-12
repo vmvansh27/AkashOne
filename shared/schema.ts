@@ -389,3 +389,224 @@ export const insertUserActivitySchema = createInsertSchema(userActivities).omit(
 
 export type UserActivity = typeof userActivities.$inferSelect;
 export type InsertUserActivity = z.infer<typeof insertUserActivitySchema>;
+
+// Block Storage Volumes
+export const volumes = pgTable("volumes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  displayName: text("display_name"),
+  state: text("state").notNull().default("Creating"), // Creating, Ready, Allocated, Attached, Detaching, etc.
+  type: text("type").notNull().default("DATADISK"), // DATADISK, ROOT
+  size: integer("size").notNull(), // GB
+  diskOfferingId: varchar("disk_offering_id"),
+  diskOfferingName: text("disk_offering_name"),
+  attachedVmId: varchar("attached_vm_id"), // null if not attached
+  attachedVmName: text("attached_vm_name"),
+  zoneId: varchar("zone_id").notNull(),
+  zoneName: text("zone_name"),
+  deviceId: integer("device_id"), // Device ID when attached
+  path: text("path"), // Mount path if attached
+  storageType: text("storage_type"), // local, shared, networked
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastSynced: timestamp("last_synced").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertVolumeSchema = createInsertSchema(volumes).omit({
+  id: true,
+  createdAt: true,
+  lastSynced: true,
+});
+
+export type Volume = typeof volumes.$inferSelect;
+export type InsertVolume = z.infer<typeof insertVolumeSchema>;
+
+// Virtual Private Cloud (VPC)
+export const vpcs = pgTable("vpcs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  displayName: text("display_name"),
+  cidr: text("cidr").notNull(), // e.g., 10.0.0.0/16
+  state: text("state").notNull().default("Enabled"),
+  vpcOfferingId: varchar("vpc_offering_id").notNull(),
+  vpcOfferingName: text("vpc_offering_name"),
+  zoneId: varchar("zone_id").notNull(),
+  zoneName: text("zone_name"),
+  networkDomain: text("network_domain"), // DNS domain
+  redundantRouter: boolean("redundant_router").default(false),
+  region: text("region"),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastSynced: timestamp("last_synced").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertVpcSchema = createInsertSchema(vpcs).omit({
+  id: true,
+  createdAt: true,
+  lastSynced: true,
+});
+
+export type Vpc = typeof vpcs.$inferSelect;
+export type InsertVpc = z.infer<typeof insertVpcSchema>;
+
+// Firewall Rules
+export const firewallRules = pgTable("firewall_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  protocol: text("protocol").notNull(), // tcp, udp, icmp, all
+  startPort: integer("start_port"),
+  endPort: integer("end_port"),
+  cidrList: text("cidr_list").array().default(sql`ARRAY[]::text[]`), // e.g., ['0.0.0.0/0']
+  ipAddressId: varchar("ip_address_id"),
+  ipAddress: text("ip_address"),
+  state: text("state").notNull().default("Active"),
+  purpose: text("purpose"), // Firewall, PortForwarding, StaticNat, LoadBalancing
+  networkId: varchar("network_id"),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertFirewallRuleSchema = createInsertSchema(firewallRules).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type FirewallRule = typeof firewallRules.$inferSelect;
+export type InsertFirewallRule = z.infer<typeof insertFirewallRuleSchema>;
+
+// NAT Gateways
+export const natGateways = pgTable("nat_gateways", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id"),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // StaticNAT, SourceNAT, PrivateGateway
+  ipAddressId: varchar("ip_address_id").notNull(),
+  ipAddress: text("ip_address").notNull(),
+  vmId: varchar("vm_id"), // For StaticNAT
+  vmName: text("vm_name"),
+  vpcId: varchar("vpc_id"), // For VPC NAT
+  networkId: varchar("network_id"),
+  state: text("state").notNull().default("Active"),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertNatGatewaySchema = createInsertSchema(natGateways).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type NatGateway = typeof natGateways.$inferSelect;
+export type InsertNatGateway = z.infer<typeof insertNatGatewaySchema>;
+
+// SSH Keys
+export const sshKeys = pgTable("ssh_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  fingerprint: text("fingerprint").notNull(),
+  publicKey: text("public_key").notNull(),
+  privateKey: text("private_key"), // Optional, only if generated by system
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertSshKeySchema = createInsertSchema(sshKeys).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SshKey = typeof sshKeys.$inferSelect;
+export type InsertSshKey = z.infer<typeof insertSshKeySchema>;
+
+// ISO Images
+export const isoImages = pgTable("iso_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  displayText: text("display_text"),
+  osType: text("os_type"),
+  osTypeId: varchar("os_type_id"),
+  size: integer("size"), // bytes
+  isPublic: boolean("is_public").default(false),
+  bootable: boolean("bootable").default(true),
+  isExtractable: boolean("is_extractable").default(false),
+  isFeatured: boolean("is_featured").default(false),
+  isReady: boolean("is_ready").default(false),
+  url: text("url"), // Source URL
+  zoneId: varchar("zone_id"),
+  zoneName: text("zone_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertIsoImageSchema = createInsertSchema(isoImages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type IsoImage = typeof isoImages.$inferSelect;
+export type InsertIsoImage = z.infer<typeof insertIsoImageSchema>;
+
+// Reserved/Elastic IPs
+export const reservedIps = pgTable("reserved_ips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  ipAddress: text("ip_address").notNull().unique(),
+  state: text("state").notNull().default("Allocated"), // Allocated, Reserved, Free
+  isSourceNat: boolean("is_source_nat").default(false),
+  isStaticNat: boolean("is_static_nat").default(false),
+  vpcId: varchar("vpc_id"),
+  networkId: varchar("network_id"),
+  associatedVmId: varchar("associated_vm_id"),
+  associatedVmName: text("associated_vm_name"),
+  zoneId: varchar("zone_id").notNull(),
+  zoneName: text("zone_name"),
+  purpose: text("purpose"), // StaticNat, Firewall, LoadBalancer
+  tags: jsonb("tags"),
+  allocatedAt: timestamp("allocated_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertReservedIpSchema = createInsertSchema(reservedIps).omit({
+  id: true,
+  allocatedAt: true,
+});
+
+export type ReservedIp = typeof reservedIps.$inferSelect;
+export type InsertReservedIp = z.infer<typeof insertReservedIpSchema>;
+
+// IPSEC VPN Tunnels
+export const ipsecTunnels = pgTable("ipsec_tunnels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cloudstackId: varchar("cloudstack_id").notNull().unique(),
+  name: text("name").notNull(),
+  customerGatewayId: varchar("customer_gateway_id").notNull(),
+  customerGatewayIp: text("customer_gateway_ip").notNull(),
+  customerCidr: text("customer_cidr").notNull(), // Customer network CIDR
+  vpcId: varchar("vpc_id").notNull(),
+  publicIp: text("public_ip"),
+  state: text("state").notNull().default("Disconnected"), // Connected, Disconnected, Pending
+  ikePolicy: text("ike_policy"), // Encryption algorithm
+  espPolicy: text("esp_policy"), // ESP policy
+  ikeLifetime: integer("ike_lifetime").default(86400), // seconds
+  espLifetime: integer("esp_lifetime").default(3600), // seconds
+  dpd: boolean("dpd").default(true), // Dead Peer Detection
+  forceEncap: boolean("force_encap").default(false),
+  passive: boolean("passive").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  userId: varchar("user_id").references(() => users.id),
+});
+
+export const insertIpsecTunnelSchema = createInsertSchema(ipsecTunnels).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type IpsecTunnel = typeof ipsecTunnels.$inferSelect;
+export type InsertIpsecTunnel = z.infer<typeof insertIpsecTunnelSchema>;
