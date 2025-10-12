@@ -30,6 +30,15 @@ AkashOne.com is a comprehensive cloud management platform developed by Mieux Tec
 11. Helpdesk/Support tickets system (Pending)
 12. Terraform integration (Pending)
 
+## Recent Changes
+### Security Fixes (October 12, 2025)
+- **CRITICAL: Fixed cloudstackId spoofing vulnerability** in VPC Management and Block Storage features
+  - Removed client control over `cloudstackId` fields
+  - Server now generates unique identifiers (UUID-based until CloudStack API integration)
+  - Applied secure validation pattern: `insertSchema.omit({ userId: true, cloudstackId: true })`
+  - Protected fields (id, userId, cloudstackId) excluded from all client updates
+  - Architect-verified and production-ready
+
 ## System Architecture
 AkashOne.com is built with a clear separation between its frontend and backend components.
 
