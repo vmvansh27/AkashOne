@@ -815,6 +815,93 @@ export class MemStorage implements IStorage {
         icon: "Tag",
         sortOrder: 24,
       },
+      
+      // Advanced CloudStack Storage Features
+      {
+        key: "archive_storage",
+        name: "Archive Storage",
+        description: "Low-cost long-term data archival and retention",
+        category: "Storage",
+        enabled: false,
+        icon: "Archive",
+        sortOrder: 25,
+      },
+      {
+        key: "remote_backup",
+        name: "Remote Backup & Recovery",
+        description: "NAS-based backup with cross-zone replication support",
+        category: "Storage",
+        enabled: false,
+        icon: "CloudUpload",
+        sortOrder: 26,
+      },
+      
+      // Advanced Networking Features
+      {
+        key: "dns_manager",
+        name: "DNS Manager",
+        description: "Domain name system management with zone and record control",
+        category: "Networking",
+        enabled: false,
+        icon: "Globe",
+        sortOrder: 27,
+      },
+      {
+        key: "nat_gateway",
+        name: "NAT Gateway",
+        description: "Static NAT, Source NAT, and Private Gateway management",
+        category: "Networking",
+        enabled: false,
+        icon: "Router",
+        sortOrder: 28,
+      },
+      {
+        key: "ipv4_ipv6",
+        name: "IPv4/IPv6 Management",
+        description: "Advanced IP address allocation and management",
+        category: "Networking",
+        enabled: false,
+        icon: "Network",
+        sortOrder: 29,
+      },
+      {
+        key: "virtual_router",
+        name: "Virtual Router",
+        description: "CloudStack Virtual Router management and configuration",
+        category: "Networking",
+        enabled: false,
+        icon: "Route",
+        sortOrder: 30,
+      },
+      {
+        key: "ipsec_tunnels",
+        name: "IPSEC VPN Tunnels",
+        description: "Site-to-Site VPN with secure tunnel configuration",
+        category: "Networking",
+        enabled: false,
+        icon: "Tunnel",
+        sortOrder: 31,
+      },
+      {
+        key: "ddos_protection",
+        name: "DDoS Protection",
+        description: "DDoS mitigation and traffic scrubbing (external integration)",
+        category: "Networking",
+        enabled: false,
+        icon: "ShieldAlert",
+        sortOrder: 32,
+      },
+      
+      // Advanced Compute Features
+      {
+        key: "bare_metal",
+        name: "Bare Metal Servers",
+        description: "Physical dedicated servers with PXE boot and IPMI management",
+        category: "Compute",
+        enabled: false,
+        icon: "Server",
+        sortOrder: 33,
+      },
     ];
 
     for (const flag of defaultFlags) {
