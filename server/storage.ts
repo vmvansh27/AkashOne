@@ -31,6 +31,22 @@ import {
   type InsertUserActivity,
   type ServicePlan,
   type InsertServicePlan,
+  type Volume,
+  type InsertVolume,
+  type Vpc,
+  type InsertVpc,
+  type FirewallRule,
+  type InsertFirewallRule,
+  type NatGateway,
+  type InsertNatGateway,
+  type SshKey,
+  type InsertSshKey,
+  type IsoImage,
+  type InsertIsoImage,
+  type ReservedIp,
+  type InsertReservedIp,
+  type IpsecTunnel,
+  type InsertIpsecTunnel,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -157,6 +173,71 @@ export interface IStorage {
   updateServicePlan(id: string, data: Partial<ServicePlan>): Promise<ServicePlan | undefined>;
   deleteServicePlan(id: string): Promise<boolean>;
   initializeDefaultServicePlans(): Promise<void>;
+
+  // Block Storage Volumes
+  getVolumes(userId: string): Promise<Volume[]>;
+  getVolume(id: string): Promise<Volume | undefined>;
+  getVolumeByCloudstackId(cloudstackId: string): Promise<Volume | undefined>;
+  createVolume(volume: InsertVolume & { userId: string }): Promise<Volume>;
+  updateVolume(id: string, data: Partial<Volume>): Promise<Volume | undefined>;
+  deleteVolume(id: string): Promise<boolean>;
+  attachVolume(id: string, vmId: string, vmName?: string): Promise<Volume | undefined>;
+  detachVolume(id: string): Promise<Volume | undefined>;
+
+  // VPCs
+  getVpcs(userId: string): Promise<Vpc[]>;
+  getVpc(id: string): Promise<Vpc | undefined>;
+  getVpcByCloudstackId(cloudstackId: string): Promise<Vpc | undefined>;
+  createVpc(vpc: InsertVpc & { userId: string }): Promise<Vpc>;
+  updateVpc(id: string, data: Partial<Vpc>): Promise<Vpc | undefined>;
+  deleteVpc(id: string): Promise<boolean>;
+
+  // Firewall Rules
+  getFirewallRules(userId: string): Promise<FirewallRule[]>;
+  getFirewallRule(id: string): Promise<FirewallRule | undefined>;
+  getFirewallRuleByCloudstackId(cloudstackId: string): Promise<FirewallRule | undefined>;
+  createFirewallRule(rule: InsertFirewallRule & { userId: string }): Promise<FirewallRule>;
+  updateFirewallRule(id: string, data: Partial<FirewallRule>): Promise<FirewallRule | undefined>;
+  deleteFirewallRule(id: string): Promise<boolean>;
+
+  // NAT Gateways
+  getNatGateways(userId: string): Promise<NatGateway[]>;
+  getNatGateway(id: string): Promise<NatGateway | undefined>;
+  createNatGateway(gateway: InsertNatGateway & { userId: string }): Promise<NatGateway>;
+  updateNatGateway(id: string, data: Partial<NatGateway>): Promise<NatGateway | undefined>;
+  deleteNatGateway(id: string): Promise<boolean>;
+
+  // SSH Keys
+  getSshKeys(userId: string): Promise<SshKey[]>;
+  getSshKey(id: string): Promise<SshKey | undefined>;
+  getSshKeyByName(name: string, userId: string): Promise<SshKey | undefined>;
+  createSshKey(key: InsertSshKey & { userId: string }): Promise<SshKey>;
+  deleteSshKey(id: string): Promise<boolean>;
+
+  // ISO Images
+  getIsoImages(userId: string): Promise<IsoImage[]>;
+  getIsoImage(id: string): Promise<IsoImage | undefined>;
+  getIsoImageByCloudstackId(cloudstackId: string): Promise<IsoImage | undefined>;
+  createIsoImage(image: InsertIsoImage & { userId: string }): Promise<IsoImage>;
+  updateIsoImage(id: string, data: Partial<IsoImage>): Promise<IsoImage | undefined>;
+  deleteIsoImage(id: string): Promise<boolean>;
+
+  // Reserved IPs
+  getReservedIps(userId: string): Promise<ReservedIp[]>;
+  getReservedIp(id: string): Promise<ReservedIp | undefined>;
+  getReservedIpByCloudstackId(cloudstackId: string): Promise<ReservedIp | undefined>;
+  getReservedIpByAddress(ipAddress: string): Promise<ReservedIp | undefined>;
+  createReservedIp(ip: InsertReservedIp & { userId: string }): Promise<ReservedIp>;
+  updateReservedIp(id: string, data: Partial<ReservedIp>): Promise<ReservedIp | undefined>;
+  deleteReservedIp(id: string): Promise<boolean>;
+
+  // IPSEC Tunnels
+  getIpsecTunnels(userId: string): Promise<IpsecTunnel[]>;
+  getIpsecTunnel(id: string): Promise<IpsecTunnel | undefined>;
+  getIpsecTunnelByCloudstackId(cloudstackId: string): Promise<IpsecTunnel | undefined>;
+  createIpsecTunnel(tunnel: InsertIpsecTunnel & { userId: string }): Promise<IpsecTunnel>;
+  updateIpsecTunnel(id: string, data: Partial<IpsecTunnel>): Promise<IpsecTunnel | undefined>;
+  deleteIpsecTunnel(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -176,6 +257,14 @@ export class MemStorage implements IStorage {
   private discountCoupons: Map<string, DiscountCoupon>;
   private userActivities: Map<string, UserActivity>;
   private servicePlans: Map<string, ServicePlan>;
+  private volumes: Map<string, Volume>;
+  private vpcs: Map<string, Vpc>;
+  private firewallRules: Map<string, FirewallRule>;
+  private natGateways: Map<string, NatGateway>;
+  private sshKeys: Map<string, SshKey>;
+  private isoImages: Map<string, IsoImage>;
+  private reservedIps: Map<string, ReservedIp>;
+  private ipsecTunnels: Map<string, IpsecTunnel>;
 
   constructor() {
     this.users = new Map();
@@ -194,6 +283,14 @@ export class MemStorage implements IStorage {
     this.discountCoupons = new Map();
     this.userActivities = new Map();
     this.servicePlans = new Map();
+    this.volumes = new Map();
+    this.vpcs = new Map();
+    this.firewallRules = new Map();
+    this.natGateways = new Map();
+    this.sshKeys = new Map();
+    this.isoImages = new Map();
+    this.reservedIps = new Map();
+    this.ipsecTunnels = new Map();
     
     // Initialize defaults
     this.initializeDefaultFeatureFlags();
@@ -1515,6 +1612,386 @@ export class MemStorage implements IStorage {
     for (const plan of defaultPlans) {
       await this.createServicePlan(plan);
     }
+  }
+
+  // Block Storage Volumes
+  async getVolumes(userId: string): Promise<Volume[]> {
+    return Array.from(this.volumes.values()).filter(v => v.userId === userId);
+  }
+
+  async getVolume(id: string): Promise<Volume | undefined> {
+    return this.volumes.get(id);
+  }
+
+  async getVolumeByCloudstackId(cloudstackId: string): Promise<Volume | undefined> {
+    return Array.from(this.volumes.values()).find(v => v.cloudstackId === cloudstackId);
+  }
+
+  async createVolume(volume: InsertVolume & { userId: string }): Promise<Volume> {
+    const id = randomUUID();
+    const newVolume: Volume = {
+      displayName: null,
+      state: "Creating",
+      type: "DATADISK",
+      diskOfferingId: null,
+      diskOfferingName: null,
+      attachedVmId: null,
+      attachedVmName: null,
+      zoneName: null,
+      deviceId: null,
+      path: null,
+      storageType: null,
+      tags: null,
+      ...volume,
+      id,
+      createdAt: new Date(),
+      lastSynced: new Date(),
+    };
+    this.volumes.set(id, newVolume);
+    return newVolume;
+  }
+
+  async updateVolume(id: string, data: Partial<Volume>): Promise<Volume | undefined> {
+    const volume = this.volumes.get(id);
+    if (!volume) return undefined;
+    const updated = { ...volume, ...data, lastSynced: new Date() };
+    this.volumes.set(id, updated);
+    return updated;
+  }
+
+  async deleteVolume(id: string): Promise<boolean> {
+    return this.volumes.delete(id);
+  }
+
+  async attachVolume(id: string, vmId: string, vmName?: string): Promise<Volume | undefined> {
+    const volume = this.volumes.get(id);
+    if (!volume) return undefined;
+    const updated = {
+      ...volume,
+      attachedVmId: vmId,
+      attachedVmName: vmName ?? null,
+      state: "Attached",
+      lastSynced: new Date(),
+    };
+    this.volumes.set(id, updated);
+    return updated;
+  }
+
+  async detachVolume(id: string): Promise<Volume | undefined> {
+    const volume = this.volumes.get(id);
+    if (!volume) return undefined;
+    const updated = {
+      ...volume,
+      attachedVmId: null,
+      attachedVmName: null,
+      deviceId: null,
+      path: null,
+      state: "Ready",
+      lastSynced: new Date(),
+    };
+    this.volumes.set(id, updated);
+    return updated;
+  }
+
+  // VPCs
+  async getVpcs(userId: string): Promise<Vpc[]> {
+    return Array.from(this.vpcs.values()).filter(v => v.userId === userId);
+  }
+
+  async getVpc(id: string): Promise<Vpc | undefined> {
+    return this.vpcs.get(id);
+  }
+
+  async getVpcByCloudstackId(cloudstackId: string): Promise<Vpc | undefined> {
+    return Array.from(this.vpcs.values()).find(v => v.cloudstackId === cloudstackId);
+  }
+
+  async createVpc(vpc: InsertVpc & { userId: string }): Promise<Vpc> {
+    const id = randomUUID();
+    const newVpc: Vpc = {
+      displayName: null,
+      state: "Enabled",
+      vpcOfferingName: null,
+      networkDomain: null,
+      redundantRouter: false,
+      region: null,
+      tags: null,
+      zoneName: null,
+      ...vpc,
+      id,
+      createdAt: new Date(),
+      lastSynced: new Date(),
+    };
+    this.vpcs.set(id, newVpc);
+    return newVpc;
+  }
+
+  async updateVpc(id: string, data: Partial<Vpc>): Promise<Vpc | undefined> {
+    const vpc = this.vpcs.get(id);
+    if (!vpc) return undefined;
+    const updated = { ...vpc, ...data, lastSynced: new Date() };
+    this.vpcs.set(id, updated);
+    return updated;
+  }
+
+  async deleteVpc(id: string): Promise<boolean> {
+    return this.vpcs.delete(id);
+  }
+
+  // Firewall Rules
+  async getFirewallRules(userId: string): Promise<FirewallRule[]> {
+    return Array.from(this.firewallRules.values()).filter(r => r.userId === userId);
+  }
+
+  async getFirewallRule(id: string): Promise<FirewallRule | undefined> {
+    return this.firewallRules.get(id);
+  }
+
+  async getFirewallRuleByCloudstackId(cloudstackId: string): Promise<FirewallRule | undefined> {
+    return Array.from(this.firewallRules.values()).find(r => r.cloudstackId === cloudstackId);
+  }
+
+  async createFirewallRule(rule: InsertFirewallRule & { userId: string }): Promise<FirewallRule> {
+    const id = randomUUID();
+    const newRule: FirewallRule = {
+      state: "Active",
+      startPort: null,
+      endPort: null,
+      cidrList: [],
+      ipAddressId: null,
+      ipAddress: null,
+      purpose: null,
+      networkId: null,
+      tags: null,
+      ...rule,
+      id,
+      createdAt: new Date(),
+    };
+    this.firewallRules.set(id, newRule);
+    return newRule;
+  }
+
+  async updateFirewallRule(id: string, data: Partial<FirewallRule>): Promise<FirewallRule | undefined> {
+    const rule = this.firewallRules.get(id);
+    if (!rule) return undefined;
+    const updated = { ...rule, ...data };
+    this.firewallRules.set(id, updated);
+    return updated;
+  }
+
+  async deleteFirewallRule(id: string): Promise<boolean> {
+    return this.firewallRules.delete(id);
+  }
+
+  // NAT Gateways
+  async getNatGateways(userId: string): Promise<NatGateway[]> {
+    return Array.from(this.natGateways.values()).filter(g => g.userId === userId);
+  }
+
+  async getNatGateway(id: string): Promise<NatGateway | undefined> {
+    return this.natGateways.get(id);
+  }
+
+  async createNatGateway(gateway: InsertNatGateway & { userId: string }): Promise<NatGateway> {
+    const id = randomUUID();
+    const newGateway: NatGateway = {
+      cloudstackId: null,
+      vmId: null,
+      vmName: null,
+      vpcId: null,
+      networkId: null,
+      state: "Active",
+      tags: null,
+      ...gateway,
+      id,
+      createdAt: new Date(),
+    };
+    this.natGateways.set(id, newGateway);
+    return newGateway;
+  }
+
+  async updateNatGateway(id: string, data: Partial<NatGateway>): Promise<NatGateway | undefined> {
+    const gateway = this.natGateways.get(id);
+    if (!gateway) return undefined;
+    const updated = { ...gateway, ...data };
+    this.natGateways.set(id, updated);
+    return updated;
+  }
+
+  async deleteNatGateway(id: string): Promise<boolean> {
+    return this.natGateways.delete(id);
+  }
+
+  // SSH Keys
+  async getSshKeys(userId: string): Promise<SshKey[]> {
+    return Array.from(this.sshKeys.values()).filter(k => k.userId === userId);
+  }
+
+  async getSshKey(id: string): Promise<SshKey | undefined> {
+    return this.sshKeys.get(id);
+  }
+
+  async getSshKeyByName(name: string, userId: string): Promise<SshKey | undefined> {
+    return Array.from(this.sshKeys.values()).find(k => k.name === name && k.userId === userId);
+  }
+
+  async createSshKey(key: InsertSshKey & { userId: string }): Promise<SshKey> {
+    const id = randomUUID();
+    const newKey: SshKey = {
+      privateKey: null,
+      ...key,
+      id,
+      createdAt: new Date(),
+    };
+    this.sshKeys.set(id, newKey);
+    return newKey;
+  }
+
+  async deleteSshKey(id: string): Promise<boolean> {
+    return this.sshKeys.delete(id);
+  }
+
+  // ISO Images
+  async getIsoImages(userId: string): Promise<IsoImage[]> {
+    return Array.from(this.isoImages.values()).filter(i => i.userId === userId);
+  }
+
+  async getIsoImage(id: string): Promise<IsoImage | undefined> {
+    return this.isoImages.get(id);
+  }
+
+  async getIsoImageByCloudstackId(cloudstackId: string): Promise<IsoImage | undefined> {
+    return Array.from(this.isoImages.values()).find(i => i.cloudstackId === cloudstackId);
+  }
+
+  async createIsoImage(image: InsertIsoImage & { userId: string }): Promise<IsoImage> {
+    const id = randomUUID();
+    const newImage: IsoImage = {
+      displayText: null,
+      osType: null,
+      osTypeId: null,
+      size: null,
+      isPublic: false,
+      bootable: true,
+      isExtractable: false,
+      isFeatured: false,
+      isReady: false,
+      url: null,
+      zoneId: null,
+      zoneName: null,
+      ...image,
+      id,
+      createdAt: new Date(),
+    };
+    this.isoImages.set(id, newImage);
+    return newImage;
+  }
+
+  async updateIsoImage(id: string, data: Partial<IsoImage>): Promise<IsoImage | undefined> {
+    const image = this.isoImages.get(id);
+    if (!image) return undefined;
+    const updated = { ...image, ...data };
+    this.isoImages.set(id, updated);
+    return updated;
+  }
+
+  async deleteIsoImage(id: string): Promise<boolean> {
+    return this.isoImages.delete(id);
+  }
+
+  // Reserved IPs
+  async getReservedIps(userId: string): Promise<ReservedIp[]> {
+    return Array.from(this.reservedIps.values()).filter(ip => ip.userId === userId);
+  }
+
+  async getReservedIp(id: string): Promise<ReservedIp | undefined> {
+    return this.reservedIps.get(id);
+  }
+
+  async getReservedIpByCloudstackId(cloudstackId: string): Promise<ReservedIp | undefined> {
+    return Array.from(this.reservedIps.values()).find(ip => ip.cloudstackId === cloudstackId);
+  }
+
+  async getReservedIpByAddress(ipAddress: string): Promise<ReservedIp | undefined> {
+    return Array.from(this.reservedIps.values()).find(ip => ip.ipAddress === ipAddress);
+  }
+
+  async createReservedIp(ip: InsertReservedIp & { userId: string }): Promise<ReservedIp> {
+    const id = randomUUID();
+    const newIp: ReservedIp = {
+      state: "Allocated",
+      isSourceNat: false,
+      isStaticNat: false,
+      vpcId: null,
+      networkId: null,
+      associatedVmId: null,
+      associatedVmName: null,
+      zoneName: null,
+      purpose: null,
+      tags: null,
+      ...ip,
+      id,
+      allocatedAt: new Date(),
+    };
+    this.reservedIps.set(id, newIp);
+    return newIp;
+  }
+
+  async updateReservedIp(id: string, data: Partial<ReservedIp>): Promise<ReservedIp | undefined> {
+    const ip = this.reservedIps.get(id);
+    if (!ip) return undefined;
+    const updated = { ...ip, ...data };
+    this.reservedIps.set(id, updated);
+    return updated;
+  }
+
+  async deleteReservedIp(id: string): Promise<boolean> {
+    return this.reservedIps.delete(id);
+  }
+
+  // IPSEC Tunnels
+  async getIpsecTunnels(userId: string): Promise<IpsecTunnel[]> {
+    return Array.from(this.ipsecTunnels.values()).filter(t => t.userId === userId);
+  }
+
+  async getIpsecTunnel(id: string): Promise<IpsecTunnel | undefined> {
+    return this.ipsecTunnels.get(id);
+  }
+
+  async getIpsecTunnelByCloudstackId(cloudstackId: string): Promise<IpsecTunnel | undefined> {
+    return Array.from(this.ipsecTunnels.values()).find(t => t.cloudstackId === cloudstackId);
+  }
+
+  async createIpsecTunnel(tunnel: InsertIpsecTunnel & { userId: string }): Promise<IpsecTunnel> {
+    const id = randomUUID();
+    const newTunnel: IpsecTunnel = {
+      state: "Disconnected",
+      publicIp: null,
+      ikePolicy: null,
+      espPolicy: null,
+      ikeLifetime: 86400,
+      espLifetime: 3600,
+      dpd: true,
+      forceEncap: false,
+      passive: false,
+      ...tunnel,
+      id,
+      createdAt: new Date(),
+    };
+    this.ipsecTunnels.set(id, newTunnel);
+    return newTunnel;
+  }
+
+  async updateIpsecTunnel(id: string, data: Partial<IpsecTunnel>): Promise<IpsecTunnel | undefined> {
+    const tunnel = this.ipsecTunnels.get(id);
+    if (!tunnel) return undefined;
+    const updated = { ...tunnel, ...data };
+    this.ipsecTunnels.set(id, updated);
+    return updated;
+  }
+
+  async deleteIpsecTunnel(id: string): Promise<boolean> {
+    return this.ipsecTunnels.delete(id);
   }
 }
 

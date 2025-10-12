@@ -12,7 +12,7 @@ import {
   disableTwoFactor,
 } from "./auth";
 import { createFeatureFlagMiddleware } from "./middleware/feature-flags";
-import { insertDiscountCouponSchema } from "@shared/schema";
+import { insertDiscountCouponSchema, insertVolumeSchema } from "@shared/schema";
 
 declare module "express-session" {
   interface SessionData {
@@ -1173,7 +1173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUser(req.session.userId);
-      const plans = await storage.getServicePlans(user?.organizationId);
+      const plans = await storage.getServicePlans(user?.organizationId ?? undefined);
       res.json(plans);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1901,6 +1901,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ message: "Discount percentage updated successfully", user });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Block Storage (Volumes) endpoints
+  app.get("/api/volumes", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const volumes = await storage.getVolumes(req.session.userId);
+      res.json(volumes);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/volumes/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const volume = await storage.getVolume(req.params.id);
+      if (!volume) {
+        return res.status(404).json({ message: "Volume not found" });
+      }
+      if (volume.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+      res.json(volume);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/volumes", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertVolumeSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+      const volume = await storage.createVolume(validatedData);
+      res.status(201).json(volume);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/volumes/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const volume = await storage.getVolume(req.params.id);
+      if (!volume) {
+        return res.status(404).json({ message: "Volume not found" });
+      }
+      if (volume.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Exclude protected/immutable fields from updates
+      const validatedData = insertVolumeSchema.partial().omit({
+        id: true,
+        userId: true,
+        cloudstackId: true,
+        createdAt: true,
+        lastSynced: true,
+      }).parse(req.body);
+      
+      const updated = await storage.updateVolume(req.params.id, validatedData);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/volumes/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const volume = await storage.getVolume(req.params.id);
+      if (!volume) {
+        return res.status(404).json({ message: "Volume not found" });
+      }
+      if (volume.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteVolume(req.params.id);
+      res.json({ message: "Volume deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Attach volume to VM
+  app.post("/api/volumes/:id/attach", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const volume = await storage.getVolume(req.params.id);
+      if (!volume) {
+        return res.status(404).json({ message: "Volume not found" });
+      }
+      if (volume.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const { vmId, vmName } = req.body;
+      if (!vmId) {
+        return res.status(400).json({ message: "VM ID is required" });
+      }
+
+      const updated = await storage.attachVolume(req.params.id, vmId, vmName);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Detach volume from VM
+  app.post("/api/volumes/:id/detach", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const volume = await storage.getVolume(req.params.id);
+      if (!volume) {
+        return res.status(404).json({ message: "Volume not found" });
+      }
+      if (volume.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const updated = await storage.detachVolume(req.params.id);
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

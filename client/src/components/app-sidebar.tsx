@@ -224,7 +224,7 @@ const superAdminItems: MenuItem[] = [
 const cloudStackItems: MenuItem[] = [
   {
     title: "Block Storage",
-    url: "/volumes",
+    url: "/block-storage",
     icon: HardDrive,
     featureKey: "volumes",
   },

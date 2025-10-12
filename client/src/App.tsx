@@ -41,6 +41,7 @@ import UserDiscounts from "@/pages/user-discounts";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Volumes from "@/pages/volumes";
+import BlockStorage from "@/pages/block-storage";
 import Firewall from "@/pages/firewall";
 import SecurityGroups from "@/pages/security-groups";
 import VPC from "@/pages/vpc";
@@ -104,6 +105,7 @@ function Router() {
       <Route path="/team-management" component={TeamManagement} />
       <Route path="/role-management" component={RoleManagement} />
       <Route path="/volumes" component={Volumes} />
+      <Route path="/block-storage" component={BlockStorage} />
       <Route path="/firewall" component={Firewall} />
       <Route path="/security-groups" component={SecurityGroups} />
       <Route path="/vpc" component={VPC} />
