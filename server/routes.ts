@@ -12,7 +12,7 @@ import {
   disableTwoFactor,
 } from "./auth";
 import { createFeatureFlagMiddleware } from "./middleware/feature-flags";
-import { insertDiscountCouponSchema, insertVolumeSchema } from "@shared/schema";
+import { insertDiscountCouponSchema, insertVolumeSchema, insertVpcSchema } from "@shared/schema";
 
 declare module "express-session" {
   interface SessionData {
@@ -1945,11 +1945,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const validatedData = insertVolumeSchema.parse({
-        ...req.body,
+      const validatedData = insertVolumeSchema.omit({ userId: true }).parse(req.body);
+      const volume = await storage.createVolume({
+        ...validatedData,
         userId: req.session.userId,
       });
-      const volume = await storage.createVolume(validatedData);
       res.status(201).json(volume);
     } catch (error: any) {
       if (error.name === "ZodError") {
@@ -1975,11 +1975,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Exclude protected/immutable fields from updates
       const validatedData = insertVolumeSchema.partial().omit({
-        id: true,
         userId: true,
         cloudstackId: true,
-        createdAt: true,
-        lastSynced: true,
       }).parse(req.body);
       
       const updated = await storage.updateVolume(req.params.id, validatedData);
@@ -2057,6 +2054,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.detachVolume(req.params.id);
       res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===================================
+  // VPC (Virtual Private Cloud) endpoints
+  // ===================================
+
+  app.get("/api/vpcs", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const vpcs = await storage.getVpcs(req.session.userId);
+      res.json(vpcs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/vpcs/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const vpc = await storage.getVpc(req.params.id);
+      if (!vpc) {
+        return res.status(404).json({ message: "VPC not found" });
+      }
+      if (vpc.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+      res.json(vpc);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/vpcs", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertVpcSchema.omit({ userId: true }).parse(req.body);
+      const vpc = await storage.createVpc({
+        ...validatedData,
+        userId: req.session.userId,
+      });
+      res.status(201).json(vpc);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/vpcs/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const vpc = await storage.getVpc(req.params.id);
+      if (!vpc) {
+        return res.status(404).json({ message: "VPC not found" });
+      }
+      if (vpc.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Exclude protected/immutable fields from updates
+      const validatedData = insertVpcSchema.partial().omit({
+        userId: true,
+        cloudstackId: true,
+      }).parse(req.body);
+      
+      const updated = await storage.updateVpc(req.params.id, validatedData);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/vpcs/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const vpc = await storage.getVpc(req.params.id);
+      if (!vpc) {
+        return res.status(404).json({ message: "VPC not found" });
+      }
+      if (vpc.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteVpc(req.params.id);
+      res.json({ message: "VPC deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
