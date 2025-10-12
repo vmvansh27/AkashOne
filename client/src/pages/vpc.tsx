@@ -16,7 +16,6 @@ interface CreateVpcData {
   name: string;
   displayName: string;
   cidr: string;
-  cloudstackId: string;
   vpcOfferingId: string;
   vpcOfferingName: string;
   zoneId: string;
@@ -38,7 +37,6 @@ export default function VPC() {
     name: "",
     displayName: "",
     cidr: "10.0.0.0/16",
-    cloudstackId: "",
     vpcOfferingId: "",
     vpcOfferingName: "",
     zoneId: "",
@@ -59,7 +57,6 @@ export default function VPC() {
         name: "",
         displayName: "",
         cidr: "10.0.0.0/16",
-        cloudstackId: "",
         vpcOfferingId: "",
         vpcOfferingName: "",
         zoneId: "",
@@ -230,28 +227,16 @@ export default function VPC() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cidr">CIDR Block *</Label>
-                  <Input
-                    id="cidr"
-                    placeholder="10.0.0.0/16"
-                    value={formData.cidr}
-                    onChange={(e) => setFormData({ ...formData, cidr: e.target.value })}
-                    required
-                    data-testid="input-vpc-cidr"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cloudstackId">CloudStack ID *</Label>
-                  <Input
-                    id="cloudstackId"
-                    value={formData.cloudstackId}
-                    onChange={(e) => setFormData({ ...formData, cloudstackId: e.target.value })}
-                    required
-                    data-testid="input-vpc-cloudstack-id"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="cidr">CIDR Block *</Label>
+                <Input
+                  id="cidr"
+                  placeholder="10.0.0.0/16"
+                  value={formData.cidr}
+                  onChange={(e) => setFormData({ ...formData, cidr: e.target.value })}
+                  required
+                  data-testid="input-vpc-cidr"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

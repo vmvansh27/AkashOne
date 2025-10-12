@@ -2101,9 +2101,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const validatedData = insertVpcSchema.omit({ userId: true }).parse(req.body);
+      const validatedData = insertVpcSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      // In production, cloudstackId would come from CloudStack API response
+      // For now, generate a unique ID (this will be replaced when CloudStack integration is active)
+      const cloudstackId = `vpc-${randomUUID().split('-')[0]}`;
       const vpc = await storage.createVpc({
         ...validatedData,
+        cloudstackId,
         userId: req.session.userId,
       });
       res.status(201).json(vpc);
