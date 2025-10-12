@@ -1945,9 +1945,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const validatedData = insertVolumeSchema.omit({ userId: true }).parse(req.body);
+      const validatedData = insertVolumeSchema.omit({ userId: true, cloudstackId: true }).parse(req.body);
+      // In production, cloudstackId would come from CloudStack API response
+      // For now, generate a unique ID (this will be replaced when CloudStack integration is active)
+      const cloudstackId = `vol-${randomUUID().split('-')[0]}`;
       const volume = await storage.createVolume({
         ...validatedData,
+        cloudstackId,
         userId: req.session.userId,
       });
       res.status(201).json(volume);
