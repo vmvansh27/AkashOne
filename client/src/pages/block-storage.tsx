@@ -19,7 +19,6 @@ const createVolumeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   size: z.coerce.number().min(1, "Size must be at least 1 GB"),
   zoneId: z.string().min(1, "Zone is required"),
-  cloudstackId: z.string().min(1, "CloudStack ID is required"),
 });
 
 type CreateVolumeData = z.infer<typeof createVolumeSchema>;
@@ -38,7 +37,6 @@ export default function BlockStorage() {
       name: "",
       size: 10,
       zoneId: "",
-      cloudstackId: "",
     },
   });
 
@@ -155,19 +153,6 @@ export default function BlockStorage() {
                           <SelectItem value="zone-3">Bangalore (India)</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="cloudstackId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CloudStack ID</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="cs-volume-id" data-testid="input-cloudstack-id" />
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
