@@ -339,6 +339,34 @@ export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 
+// Service Plans - Custom machine configurations (hybrid with CloudStack)
+export const servicePlans = pgTable("service_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., "Standard Medium", "Performance Large"
+  description: text("description"), // e.g., "Perfect for web applications"
+  cpu: integer("cpu").notNull(), // Number of vCPUs
+  memory: integer("memory").notNull(), // Memory in MB
+  storage: integer("storage").notNull(), // Disk size in GB
+  bandwidth: integer("bandwidth"), // Network bandwidth in Mbps (optional)
+  cloudstackOfferingId: varchar("cloudstack_offering_id"), // Maps to CloudStack service offering
+  price: integer("price").notNull().default(0), // Monthly price in INR
+  isActive: boolean("is_active").notNull().default(true),
+  isPublic: boolean("is_public").notNull().default(true), // Public or organization-specific
+  organizationId: varchar("organization_id"), // null = global, otherwise org-specific
+  sortOrder: integer("sort_order").notNull().default(0), // Display order
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertServicePlanSchema = createInsertSchema(servicePlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ServicePlan = typeof servicePlans.$inferSelect;
+export type InsertServicePlan = z.infer<typeof insertServicePlanSchema>;
+
 // Activity Logging
 export const userActivities = pgTable("user_activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

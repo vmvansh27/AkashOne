@@ -159,6 +159,11 @@ const adminItems: MenuItem[] = [
     icon: BarChart3,
   },
   {
+    title: "Service Plans",
+    url: "/service-plans",
+    icon: Server,
+  },
+  {
     title: "Security",
     url: "/security",
     icon: Shield,

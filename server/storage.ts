@@ -29,6 +29,8 @@ import {
   type InsertDiscountCoupon,
   type UserActivity,
   type InsertUserActivity,
+  type ServicePlan,
+  type InsertServicePlan,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -147,6 +149,14 @@ export interface IStorage {
   createUserActivity(activity: InsertUserActivity): Promise<UserActivity>;
   getRecentActivities(limit?: number): Promise<UserActivity[]>;
   getUserActivitiesByAction(userId: string, action: string): Promise<UserActivity[]>;
+
+  // Service Plans
+  getServicePlans(organizationId?: string): Promise<ServicePlan[]>;
+  getServicePlan(id: string): Promise<ServicePlan | undefined>;
+  createServicePlan(plan: InsertServicePlan): Promise<ServicePlan>;
+  updateServicePlan(id: string, data: Partial<ServicePlan>): Promise<ServicePlan | undefined>;
+  deleteServicePlan(id: string): Promise<boolean>;
+  initializeDefaultServicePlans(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -165,6 +175,7 @@ export class MemStorage implements IStorage {
   private teamMembers: Map<string, TeamMember>;
   private discountCoupons: Map<string, DiscountCoupon>;
   private userActivities: Map<string, UserActivity>;
+  private servicePlans: Map<string, ServicePlan>;
 
   constructor() {
     this.users = new Map();
@@ -182,11 +193,13 @@ export class MemStorage implements IStorage {
     this.teamMembers = new Map();
     this.discountCoupons = new Map();
     this.userActivities = new Map();
+    this.servicePlans = new Map();
     
     // Initialize defaults
     this.initializeDefaultFeatureFlags();
     this.initializeDefaultPermissions();
     this.initializeDefaultRoles();
+    this.initializeDefaultServicePlans();
   }
 
   async getUsers(): Promise<User[]> {
@@ -1286,6 +1299,135 @@ export class MemStorage implements IStorage {
     return Array.from(this.userActivities.values())
       .filter(a => a.userId === userId && a.action === action)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  // Service Plans
+  async getServicePlans(organizationId?: string): Promise<ServicePlan[]> {
+    let plans = Array.from(this.servicePlans.values());
+    
+    if (organizationId) {
+      plans = plans.filter(p => p.organizationId === organizationId || p.isPublic);
+    } else {
+      plans = plans.filter(p => p.isPublic);
+    }
+    
+    return plans
+      .filter(p => p.isActive)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async getServicePlan(id: string): Promise<ServicePlan | undefined> {
+    return this.servicePlans.get(id);
+  }
+
+  async createServicePlan(plan: InsertServicePlan): Promise<ServicePlan> {
+    const id = randomUUID();
+    const newPlan: ServicePlan = {
+      ...plan,
+      id,
+      isActive: plan.isActive ?? true,
+      isPublic: plan.isPublic ?? true,
+      organizationId: plan.organizationId || null,
+      bandwidth: plan.bandwidth || null,
+      cloudstackOfferingId: plan.cloudstackOfferingId || null,
+      description: plan.description || null,
+      price: plan.price || 0,
+      sortOrder: plan.sortOrder || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
+    this.servicePlans.set(id, newPlan);
+    return newPlan;
+  }
+
+  async updateServicePlan(id: string, data: Partial<ServicePlan>): Promise<ServicePlan | undefined> {
+    const plan = this.servicePlans.get(id);
+    if (!plan) return undefined;
+    
+    const updated = { ...plan, ...data, updatedAt: new Date() };
+    this.servicePlans.set(id, updated);
+    return updated;
+  }
+
+  async deleteServicePlan(id: string): Promise<boolean> {
+    return this.servicePlans.delete(id);
+  }
+
+  async initializeDefaultServicePlans(): Promise<void> {
+    if (this.servicePlans.size > 0) return;
+
+    const defaultPlans: InsertServicePlan[] = [
+      {
+        name: "Micro",
+        description: "Perfect for testing and small applications",
+        cpu: 1,
+        memory: 1024, // 1 GB
+        storage: 25,
+        bandwidth: 1000, // 1 Gbps
+        price: 500, // INR 500/month
+        isActive: true,
+        isPublic: true,
+        organizationId: null,
+        sortOrder: 1,
+      },
+      {
+        name: "Small",
+        description: "Ideal for small websites and development",
+        cpu: 2,
+        memory: 2048, // 2 GB
+        storage: 50,
+        bandwidth: 2000,
+        price: 1000, // INR 1000/month
+        isActive: true,
+        isPublic: true,
+        organizationId: null,
+        sortOrder: 2,
+      },
+      {
+        name: "Medium",
+        description: "Great for growing applications",
+        cpu: 4,
+        memory: 4096, // 4 GB
+        storage: 100,
+        bandwidth: 3000,
+        price: 2000, // INR 2000/month
+        isActive: true,
+        isPublic: true,
+        organizationId: null,
+        sortOrder: 3,
+      },
+      {
+        name: "Large",
+        description: "For production workloads",
+        cpu: 8,
+        memory: 8192, // 8 GB
+        storage: 200,
+        bandwidth: 5000,
+        price: 4000, // INR 4000/month
+        isActive: true,
+        isPublic: true,
+        organizationId: null,
+        sortOrder: 4,
+      },
+      {
+        name: "X-Large",
+        description: "High performance computing",
+        cpu: 16,
+        memory: 16384, // 16 GB
+        storage: 500,
+        bandwidth: 10000,
+        price: 8000, // INR 8000/month
+        isActive: true,
+        isPublic: true,
+        organizationId: null,
+        sortOrder: 5,
+      },
+    ];
+
+    for (const plan of defaultPlans) {
+      await this.createServicePlan(plan);
+    }
   }
 }
 

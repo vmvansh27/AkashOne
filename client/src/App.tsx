@@ -49,6 +49,7 @@ import SSHKeys from "@/pages/ssh-keys";
 import ImagesTemplates from "@/pages/images-templates";
 import ResourceTags from "@/pages/resource-tags";
 import ActivityLogs from "@/pages/activity-logs";
+import ServicePlans from "@/pages/service-plans";
 import { useQuery } from "@tanstack/react-query";
 
 function Router() {
@@ -111,6 +112,7 @@ function Router() {
       <Route path="/images-templates" component={ImagesTemplates} />
       <Route path="/resource-tags" component={ResourceTags} />
       <Route path="/activity-logs" component={ActivityLogs} />
+      <Route path="/service-plans" component={ServicePlans} />
       <Route component={NotFound} />
     </Switch>
   );

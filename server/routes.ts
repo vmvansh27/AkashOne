@@ -1162,6 +1162,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===================================
+  // Service Plans (Machine Configurations)
+  // ===================================
+
+  // Get all service plans
+  app.get("/api/service-plans", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      const plans = await storage.getServicePlans(user?.organizationId);
+      res.json(plans);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get single service plan
+  app.get("/api/service-plans/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const plan = await storage.getServicePlan(req.params.id);
+      if (!plan) {
+        return res.status(404).json({ message: "Service plan not found" });
+      }
+
+      res.json(plan);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create service plan
+  app.post("/api/service-plans", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Check admin/reseller permission
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions to manage service plans" });
+      }
+
+      // Validate request with Zod
+      const { insertServicePlanSchema } = await import("@shared/schema");
+      const validatedData = insertServicePlanSchema.parse(req.body);
+
+      const user = await storage.getUser(req.session.userId);
+      const plan = await storage.createServicePlan({
+        ...validatedData,
+        organizationId: user?.organizationId || null,
+      });
+
+      res.json(plan);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update service plan
+  app.patch("/api/service-plans/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Check admin/reseller permission
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions to manage service plans" });
+      }
+
+      const updated = await storage.updateServicePlan(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Service plan not found" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete service plan
+  app.delete("/api/service-plans/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Check admin/reseller permission
+      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
+      if (!hasPermission) {
+        return res.status(403).json({ message: "Insufficient permissions to manage service plans" });
+      }
+
+      const deleted = await storage.deleteServicePlan(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Service plan not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ===================================
   // Activity Logging
   // ===================================
 

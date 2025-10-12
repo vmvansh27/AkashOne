@@ -111,10 +111,19 @@ export default function VirtualMachines() {
     enabled: createDialogOpen,
   });
 
-  const { data: serviceOfferings = [] } = useQuery<any[]>({
+  const { data: cloudstackOfferings = [] } = useQuery<any[]>({
     queryKey: ["/api/cloudstack/service-offerings"],
     enabled: createDialogOpen,
   });
+
+  // Fetch custom service plans as fallback
+  const { data: customPlans = [] } = useQuery<any[]>({
+    queryKey: ["/api/service-plans"],
+    enabled: createDialogOpen,
+  });
+
+  // Use CloudStack offerings if available, otherwise use custom plans
+  const serviceOfferings = cloudstackOfferings.length > 0 ? cloudstackOfferings : customPlans;
 
   const [selectedZone, setSelectedZone] = useState<string>("");
   const { data: templates = [] } = useQuery<any[]>({
