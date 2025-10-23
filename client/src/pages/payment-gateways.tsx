@@ -3,8 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Settings, CheckCircle, AlertCircle } from "lucide-react";
 import { SiStripe, SiRazorpay, SiPaypal } from "react-icons/si";
+import { useResellerAccess } from "@/hooks/use-role-access";
 
 export default function PaymentGateways() {
+  const { hasAccess, isLoading } = useResellerAccess();
+
+  if (isLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const gateways = [
     {
       name: "Stripe",

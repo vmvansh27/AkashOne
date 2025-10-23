@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Shield, UserPlus } from "lucide-react";
+import { useSuperAdminAccess } from "@/hooks/use-role-access";
 import {
   Table,
   TableBody,
@@ -102,6 +103,16 @@ const mockAdmins: AdminUser[] = [
 ];
 
 export default function AdminRights() {
+  const { hasAccess, isLoading } = useSuperAdminAccess();
+
+  if (isLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAdmin, setSelectedAdmin] = useState<AdminUser | null>(null);
   const { toast } = useToast();

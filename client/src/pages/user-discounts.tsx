@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useResellerAccess } from "@/hooks/use-role-access";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,16 @@ interface User {
 }
 
 export default function UserDiscounts() {
+  const { hasAccess, isLoading: isCheckingAccess } = useResellerAccess();
+
+  if (isCheckingAccess) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [discountValue, setDiscountValue] = useState<string>("");

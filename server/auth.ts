@@ -13,7 +13,8 @@ export async function registerUser(
   username: string,
   email: string,
   password: string,
-  gstNumber: string
+  gstNumber: string,
+  accountType: string = "customer"
 ) {
   // Check if user already exists
   const existingUser = await storage.getUserByUsername(username);
@@ -45,6 +46,7 @@ export async function registerUser(
     email,
     password: hashedPassword,
     gstNumber,
+    accountType,
   });
 
   // Update user with verification code

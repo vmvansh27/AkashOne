@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import { useSuperAdminAccess } from "@/hooks/use-role-access";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -59,6 +60,16 @@ interface Permission {
 }
 
 export default function RoleManagement() {
+  const { hasAccess, isLoading } = useSuperAdminAccess();
+
+  if (isLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);

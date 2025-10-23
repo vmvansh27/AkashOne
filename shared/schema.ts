@@ -137,6 +137,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   password: true,
   gstNumber: true,
+  accountType: true,
 }).extend({
   gstNumber: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, "Invalid GST number format"),
 });
@@ -747,3 +748,296 @@ export const insertCdnDistributionSchema = createInsertSchema(cdnDistributions).
 
 export type CdnDistribution = typeof cdnDistributions.$inferSelect;
 export type InsertCdnDistribution = z.infer<typeof insertCdnDistributionSchema>;
+
+// Billing Addresses - Store customer billing addresses for GST compliance
+export const billingAddresses = pgTable("billing_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  addressLine1: text("address_line1").notNull(),
+  addressLine2: text("address_line2"),
+  city: text("city").notNull(),
+  state: text("state").notNull(), // State name for CGST+SGST vs IGST determination
+  stateCode: text("state_code").notNull(), // 2-digit state code (01-37)
+  postalCode: text("postal_code").notNull(),
+  country: text("country").notNull().default("India"),
+  gstNumber: text("gst_number"), // Can be different from user's primary GSTIN
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBillingAddressSchema = createInsertSchema(billingAddresses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type BillingAddress = typeof billingAddresses.$inferSelect;
+export type InsertBillingAddress = z.infer<typeof insertBillingAddressSchema>;
+
+// Invoices - Main invoice table with GST compliance
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(), // Sequential: INV-2024-0001
+  userId: varchar("user_id").notNull().references(() => users.id),
+  billingAddressId: varchar("billing_address_id").notNull().references(() => billingAddresses.id),
+  billingPeriodStart: timestamp("billing_period_start").notNull(),
+  billingPeriodEnd: timestamp("billing_period_end").notNull(),
+  
+  // Amounts in INR (stored as integers in paise: 1 INR = 100 paise)
+  subtotalAmount: integer("subtotal_amount").notNull(), // Base amount before tax
+  cgstAmount: integer("cgst_amount").notNull().default(0), // Central GST (9%)
+  sgstAmount: integer("sgst_amount").notNull().default(0), // State GST (9%)
+  igstAmount: integer("igst_amount").notNull().default(0), // Integrated GST (18%)
+  discountAmount: integer("discount_amount").notNull().default(0),
+  totalAmount: integer("total_amount").notNull(), // Final amount including tax
+  
+  // GST Compliance
+  taxType: text("tax_type").notNull(), // "intra_state" (CGST+SGST) or "inter_state" (IGST)
+  gstRate: integer("gst_rate").notNull().default(18), // 18% standard rate
+  hsnCode: text("hsn_code").default("998314"), // HSN for cloud services
+  sacCode: text("sac_code").default("998314"), // SAC for IT services
+  placeOfSupply: text("place_of_supply").notNull(), // State name
+  
+  // E-Invoicing provisions (for future integration)
+  einvoiceIrn: text("einvoice_irn"), // Invoice Reference Number from IRP
+  einvoiceAckNo: text("einvoice_ack_no"), // Acknowledgment Number
+  einvoiceAckDate: timestamp("einvoice_ack_date"), // Acknowledgment Date
+  einvoiceQrCode: text("einvoice_qr_code"), // Base64 QR code
+  einvoiceEnabled: boolean("einvoice_enabled").default(false),
+  
+  // Invoice status
+  status: text("status").notNull().default("draft"), // draft, issued, paid, overdue, cancelled
+  dueDate: timestamp("due_date").notNull(),
+  paidAt: timestamp("paid_at"),
+  
+  // Metadata
+  notes: text("notes"),
+  currency: text("currency").notNull().default("INR"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+
+// Invoice Line Items - Itemized breakdown for each invoice
+export const invoiceLineItems = pgTable("invoice_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => invoices.id, { onDelete: 'cascade' }),
+  
+  // Resource details
+  resourceType: text("resource_type").notNull(), // vm, storage, network, database, kubernetes
+  resourceId: varchar("resource_id"), // ID of the actual resource
+  resourceName: text("resource_name").notNull(),
+  description: text("description").notNull(),
+  
+  // Quantity and pricing (amounts in paise)
+  quantity: integer("quantity").notNull(), // hours, GB, units
+  unit: text("unit").notNull(), // hour, GB, unit
+  unitPrice: integer("unit_price").notNull(), // price per unit in paise
+  amount: integer("amount").notNull(), // quantity * unitPrice
+  
+  // Usage period
+  usageStart: timestamp("usage_start"),
+  usageEnd: timestamp("usage_end"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;
+export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
+
+// Usage Records - Track resource consumption for billing
+export const usageRecords = pgTable("usage_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  // Resource identification
+  resourceType: text("resource_type").notNull(), // vm, storage, network, database, kubernetes
+  resourceId: varchar("resource_id").notNull(),
+  resourceName: text("resource_name").notNull(),
+  
+  // Usage metrics
+  metricType: text("metric_type").notNull(), // uptime, storage_gb, bandwidth_gb, requests
+  quantity: integer("quantity").notNull(), // Amount consumed
+  unit: text("unit").notNull(), // hour, GB, request
+  
+  // Pricing (amounts in paise)
+  unitPrice: integer("unit_price").notNull(),
+  totalCost: integer("total_cost").notNull(),
+  
+  // Time tracking
+  recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Invoice association
+  invoiceId: varchar("invoice_id").references(() => invoices.id),
+  billed: boolean("billed").default(false),
+  
+  // Metadata
+  metadata: jsonb("metadata"), // Additional resource-specific data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUsageRecordSchema = createInsertSchema(usageRecords).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type UsageRecord = typeof usageRecords.$inferSelect;
+export type InsertUsageRecord = z.infer<typeof insertUsageRecordSchema>;
+
+// Payment Methods - Store customer payment methods
+export const paymentMethods = pgTable("payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // Gateway details
+  gateway: text("gateway").notNull(), // razorpay, cashfree, stripe
+  gatewayMethodId: text("gateway_method_id"), // ID from payment gateway
+  
+  // Payment method details
+  type: text("type").notNull(), // card, upi, netbanking, wallet
+  
+  // Card details (masked for security)
+  cardLast4: text("card_last4"),
+  cardBrand: text("card_brand"), // visa, mastercard, rupay
+  cardExpMonth: integer("card_exp_month"),
+  cardExpYear: integer("card_exp_year"),
+  
+  // UPI details
+  upiId: text("upi_id"), // user@bank
+  
+  // Status
+  isDefault: boolean("is_default").default(false),
+  status: text("status").notNull().default("active"), // active, expired, removed
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+
+// Payment Transactions - Track all payment attempts
+export const paymentTransactions = pgTable("payment_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => invoices.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  paymentMethodId: varchar("payment_method_id").references(() => paymentMethods.id),
+  
+  // Gateway details
+  gateway: text("gateway").notNull(), // razorpay, cashfree
+  gatewayTransactionId: text("gateway_transaction_id"), // Transaction ID from gateway
+  gatewayOrderId: text("gateway_order_id"), // Order ID from gateway
+  
+  // Amount (in paise)
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull().default("INR"),
+  
+  // Status
+  status: text("status").notNull().default("pending"), // pending, processing, success, failed, refunded
+  paymentMethod: text("payment_method"), // card, upi, netbanking, wallet
+  
+  // Response data
+  gatewayResponse: jsonb("gateway_response"), // Full response from gateway
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  
+  // Timestamps
+  initiatedAt: timestamp("initiated_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPaymentTransactionSchema = createInsertSchema(paymentTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
+export type InsertPaymentTransaction = z.infer<typeof insertPaymentTransactionSchema>;
+
+// Tax Calculations - Audit trail for GST logic
+export const taxCalculations = pgTable("tax_calculations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => invoices.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  // Tax determination logic
+  supplierState: text("supplier_state").notNull(), // Your business state (Karnataka)
+  supplierStateCode: text("supplier_state_code").notNull(), // 29 for Karnataka
+  customerState: text("customer_state").notNull(),
+  customerStateCode: text("customer_state_code").notNull(),
+  
+  // Tax type determination
+  taxType: text("tax_type").notNull(), // intra_state, inter_state
+  
+  // Amounts (in paise)
+  taxableAmount: integer("taxable_amount").notNull(),
+  cgstRate: integer("cgst_rate").default(0), // 9
+  sgstRate: integer("sgst_rate").default(0), // 9
+  igstRate: integer("igst_rate").default(0), // 18
+  cgstAmount: integer("cgst_amount").default(0),
+  sgstAmount: integer("sgst_amount").default(0),
+  igstAmount: integer("igst_amount").default(0),
+  totalTaxAmount: integer("total_tax_amount").notNull(),
+  
+  // Compliance data
+  gstRate: integer("gst_rate").notNull().default(18),
+  hsnSacCode: text("hsn_sac_code").default("998314"),
+  
+  calculatedAt: timestamp("calculated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTaxCalculationSchema = createInsertSchema(taxCalculations).omit({
+  id: true,
+  createdAt: true,
+  calculatedAt: true,
+});
+
+export type TaxCalculation = typeof taxCalculations.$inferSelect;
+export type InsertTaxCalculation = z.infer<typeof insertTaxCalculationSchema>;
+
+// HSN/SAC Code Management - Configure tax codes for different services
+export const hsnCodes = pgTable("hsn_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serviceType: text("service_type").notNull().unique(), // compute, storage, database, etc.
+  hsnCode: text("hsn_code").notNull(), // HSN code for goods
+  sacCode: text("sac_code").notNull(), // SAC code for services
+  description: text("description").notNull(),
+  gstRate: integer("gst_rate").notNull().default(18), // Default 18% for cloud services
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHsnCodeSchema = createInsertSchema(hsnCodes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type HsnCode = typeof hsnCodes.$inferSelect;
+export type InsertHsnCode = z.infer<typeof insertHsnCodeSchema>;

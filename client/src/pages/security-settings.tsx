@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Shield, Smartphone, KeyRound, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -13,6 +14,10 @@ export default function SecuritySettings() {
   const { toast } = useToast();
   const [verificationCode, setVerificationCode] = useState("");
   const [showSetup, setShowSetup] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const { data: user } = useQuery<{
     id: string;
@@ -73,10 +78,53 @@ export default function SecuritySettings() {
     },
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      return await apiRequest("POST", "/api/auth/change-password", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password Changed",
+        description: "Your password has been changed successfully",
+      });
+      setShowPasswordDialog(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEnableTwoFactor = () => {
     if (verificationCode.length === 6) {
       enableTwoFactorMutation.mutate(verificationCode);
     }
+  };
+
+  const handleChangePassword = () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 8 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+    changePasswordMutation.mutate({ currentPassword, newPassword });
   };
 
   return (
@@ -209,7 +257,12 @@ export default function SecuritySettings() {
             <p className="text-sm text-muted-foreground">
               Change your password regularly to keep your account secure.
             </p>
-            <Button variant="outline" className="w-full" data-testid="button-change-password">
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => setShowPasswordDialog(true)}
+              data-testid="button-change-password"
+            >
               Change Password
             </Button>
           </CardContent>
@@ -223,7 +276,7 @@ export default function SecuritySettings() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <ul className="space-y-2 text-muted-foreground text-sm">
               <li>• Use a strong, unique password for your account</li>
               <li>• Enable two-factor authentication for enhanced security</li>
               <li>• Never share your password or 2FA codes</li>
@@ -233,6 +286,71 @@ export default function SecuritySettings() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent data-testid="dialog-change-password">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and choose a new password to update your account security.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                data-testid="input-current-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                data-testid="input-new-password"
+              />
+              <p className="text-xs text-muted-foreground">Must be at least 8 characters long</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                data-testid="input-confirm-password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPasswordDialog(false);
+                setCurrentPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+              }}
+              data-testid="button-cancel-password"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={!currentPassword || !newPassword || !confirmPassword || changePasswordMutation.isPending}
+              data-testid="button-submit-password"
+            >
+              {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -6,8 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Palette, Globe, Upload, Save } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useSuperAdminAccess } from "@/hooks/use-role-access";
 
 export default function WhiteLabel() {
+  const { hasAccess, isLoading } = useSuperAdminAccess();
+
+  if (isLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const { toast } = useToast();
   const [branding, setBranding] = useState({
     companyName: "CloudTech Solutions",

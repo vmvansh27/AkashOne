@@ -57,6 +57,22 @@ import {
   type InsertDdosProtectionRule,
   type CdnDistribution,
   type InsertCdnDistribution,
+  type BillingAddress,
+  type InsertBillingAddress,
+  type Invoice,
+  type InsertInvoice,
+  type InvoiceLineItem,
+  type InsertInvoiceLineItem,
+  type UsageRecord,
+  type InsertUsageRecord,
+  type PaymentMethod,
+  type InsertPaymentMethod,
+  type PaymentTransaction,
+  type InsertPaymentTransaction,
+  type TaxCalculation,
+  type InsertTaxCalculation,
+  type HsnCode,
+  type InsertHsnCode,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -70,6 +86,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  hasSuperAdmin(): Promise<boolean>;
 
   // Kubernetes
   getKubernetesClusters(userId: string): Promise<KubernetesCluster[]>;
@@ -278,6 +295,66 @@ export interface IStorage {
   getCdnDistribution(id: string): Promise<CdnDistribution | undefined>;
   createCdnDistribution(dist: InsertCdnDistribution & { userId: string }): Promise<CdnDistribution>;
   deleteCdnDistribution(id: string): Promise<boolean>;
+
+  // Billing Addresses
+  getBillingAddresses(userId: string): Promise<BillingAddress[]>;
+  getBillingAddress(id: string): Promise<BillingAddress | undefined>;
+  getDefaultBillingAddress(userId: string): Promise<BillingAddress | undefined>;
+  createBillingAddress(address: InsertBillingAddress & { userId: string }): Promise<BillingAddress>;
+  updateBillingAddress(id: string, data: Partial<BillingAddress>): Promise<BillingAddress | undefined>;
+  deleteBillingAddress(id: string): Promise<boolean>;
+  setDefaultBillingAddress(userId: string, addressId: string): Promise<void>;
+
+  // Invoices
+  getInvoices(userId: string, filters?: { status?: string; startDate?: Date; endDate?: Date }): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoiceByNumber(invoiceNumber: string): Promise<Invoice | undefined>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice | undefined>;
+  deleteInvoice(id: string): Promise<boolean>;
+  getNextInvoiceNumber(): Promise<string>;
+
+  // Invoice Line Items
+  getInvoiceLineItems(invoiceId: string): Promise<InvoiceLineItem[]>;
+  getInvoiceLineItem(id: string): Promise<InvoiceLineItem | undefined>;
+  createInvoiceLineItem(item: InsertInvoiceLineItem): Promise<InvoiceLineItem>;
+  deleteInvoiceLineItem(id: string): Promise<boolean>;
+
+  // Usage Records
+  getUsageRecords(userId: string, filters?: { startDate?: Date; endDate?: Date; billed?: boolean }): Promise<UsageRecord[]>;
+  getUsageRecord(id: string): Promise<UsageRecord | undefined>;
+  getUnbilledUsageRecords(userId: string): Promise<UsageRecord[]>;
+  createUsageRecord(record: InsertUsageRecord & { userId: string }): Promise<UsageRecord>;
+  markUsageRecordsAsBilled(recordIds: string[], invoiceId: string): Promise<void>;
+
+  // Payment Methods
+  getPaymentMethods(userId: string): Promise<PaymentMethod[]>;
+  getPaymentMethod(id: string): Promise<PaymentMethod | undefined>;
+  getDefaultPaymentMethod(userId: string): Promise<PaymentMethod | undefined>;
+  createPaymentMethod(method: InsertPaymentMethod & { userId: string }): Promise<PaymentMethod>;
+  updatePaymentMethod(id: string, data: Partial<PaymentMethod>): Promise<PaymentMethod | undefined>;
+  deletePaymentMethod(id: string): Promise<boolean>;
+  setDefaultPaymentMethod(userId: string, methodId: string): Promise<void>;
+
+  // Payment Transactions
+  getPaymentTransactions(userId: string): Promise<PaymentTransaction[]>;
+  getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined>;
+  getPaymentTransactionByGatewayId(gatewayTransactionId: string): Promise<PaymentTransaction | undefined>;
+  createPaymentTransaction(transaction: InsertPaymentTransaction): Promise<PaymentTransaction>;
+  updatePaymentTransaction(id: string, data: Partial<PaymentTransaction>): Promise<PaymentTransaction | undefined>;
+
+  // Tax Calculations
+  getTaxCalculations(invoiceId: string): Promise<TaxCalculation[]>;
+  getTaxCalculation(id: string): Promise<TaxCalculation | undefined>;
+  createTaxCalculation(calculation: InsertTaxCalculation): Promise<TaxCalculation>;
+
+  // HSN/SAC Codes
+  getHsnCodes(): Promise<HsnCode[]>;
+  getHsnCode(id: string): Promise<HsnCode | undefined>;
+  getHsnCodeByServiceType(serviceType: string): Promise<HsnCode | undefined>;
+  createHsnCode(code: InsertHsnCode): Promise<HsnCode>;
+  updateHsnCode(id: string, data: Partial<HsnCode>): Promise<HsnCode | undefined>;
+  deleteHsnCode(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -310,6 +387,14 @@ export class MemStorage implements IStorage {
   private objectStorageBuckets: Map<string, ObjectStorageBucket>;
   private ddosProtectionRules: Map<string, DdosProtectionRule>;
   private cdnDistributions: Map<string, CdnDistribution>;
+  private billingAddresses: Map<string, BillingAddress>;
+  private invoices: Map<string, Invoice>;
+  private invoiceLineItems: Map<string, InvoiceLineItem>;
+  private usageRecords: Map<string, UsageRecord>;
+  private paymentMethods: Map<string, PaymentMethod>;
+  private paymentTransactions: Map<string, PaymentTransaction>;
+  private taxCalculations: Map<string, TaxCalculation>;
+  private hsnCodes: Map<string, HsnCode>;
 
   constructor() {
     this.users = new Map();
@@ -341,6 +426,14 @@ export class MemStorage implements IStorage {
     this.objectStorageBuckets = new Map();
     this.ddosProtectionRules = new Map();
     this.cdnDistributions = new Map();
+    this.billingAddresses = new Map();
+    this.invoices = new Map();
+    this.invoiceLineItems = new Map();
+    this.usageRecords = new Map();
+    this.paymentMethods = new Map();
+    this.paymentTransactions = new Map();
+    this.taxCalculations = new Map();
+    this.hsnCodes = new Map();
     
     // Initialize defaults
     this.initializeDefaultFeatureFlags();
@@ -396,6 +489,12 @@ export class MemStorage implements IStorage {
     const updatedUser = { ...user, ...data };
     this.users.set(id, updatedUser);
     return updatedUser;
+  }
+
+  async hasSuperAdmin(): Promise<boolean> {
+    return Array.from(this.users.values()).some(
+      (user) => user.accountType === "super_admin"
+    );
   }
 
   // Kubernetes methods
@@ -2198,6 +2297,428 @@ export class MemStorage implements IStorage {
   async deleteCdnDistribution(id: string): Promise<boolean> {
     return this.cdnDistributions.delete(id);
   }
+
+  // Billing Addresses
+  async getBillingAddresses(userId: string): Promise<BillingAddress[]> {
+    return Array.from(this.billingAddresses.values()).filter(addr => addr.userId === userId);
+  }
+
+  async getBillingAddress(id: string): Promise<BillingAddress | undefined> {
+    return this.billingAddresses.get(id);
+  }
+
+  async getDefaultBillingAddress(userId: string): Promise<BillingAddress | undefined> {
+    return Array.from(this.billingAddresses.values()).find(
+      addr => addr.userId === userId && addr.isDefault
+    );
+  }
+
+  async createBillingAddress(address: InsertBillingAddress & { userId: string }): Promise<BillingAddress> {
+    const id = randomUUID();
+    const newAddress: BillingAddress = {
+      ...address,
+      id,
+      gstNumber: address.gstNumber ?? null,
+      addressLine2: address.addressLine2 ?? null,
+      country: address.country || "India",
+      isDefault: address.isDefault ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.billingAddresses.set(id, newAddress);
+    return newAddress;
+  }
+
+  async updateBillingAddress(id: string, data: Partial<BillingAddress>): Promise<BillingAddress | undefined> {
+    const address = this.billingAddresses.get(id);
+    if (!address) return undefined;
+    
+    const updated: BillingAddress = { ...address, ...data, updatedAt: new Date() };
+    this.billingAddresses.set(id, updated);
+    return updated;
+  }
+
+  async deleteBillingAddress(id: string): Promise<boolean> {
+    return this.billingAddresses.delete(id);
+  }
+
+  async setDefaultBillingAddress(userId: string, addressId: string): Promise<void> {
+    // Unset all defaults for this user
+    const userAddresses = Array.from(this.billingAddresses.values()).filter(a => a.userId === userId);
+    for (const addr of userAddresses) {
+      this.billingAddresses.set(addr.id, { ...addr, isDefault: false, updatedAt: new Date() });
+    }
+    
+    // Set the new default
+    const newDefault = this.billingAddresses.get(addressId);
+    if (newDefault) {
+      this.billingAddresses.set(addressId, { ...newDefault, isDefault: true, updatedAt: new Date() });
+    }
+  }
+
+  // Invoices
+  async getInvoices(userId: string, filters?: { status?: string; startDate?: Date; endDate?: Date }): Promise<Invoice[]> {
+    let invoices = Array.from(this.invoices.values()).filter(inv => inv.userId === userId);
+    
+    if (filters?.status) {
+      invoices = invoices.filter(inv => inv.status === filters.status);
+    }
+    if (filters?.startDate) {
+      invoices = invoices.filter(inv => inv.createdAt !== null && inv.createdAt >= filters.startDate!);
+    }
+    if (filters?.endDate) {
+      invoices = invoices.filter(inv => inv.createdAt !== null && inv.createdAt <= filters.endDate!);
+    }
+    
+    return invoices.sort((a, b) => {
+      const aTime = a.createdAt?.getTime() ?? 0;
+      const bTime = b.createdAt?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    return this.invoices.get(id);
+  }
+
+  async getInvoiceByNumber(invoiceNumber: string): Promise<Invoice | undefined> {
+    return Array.from(this.invoices.values()).find(inv => inv.invoiceNumber === invoiceNumber);
+  }
+
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    const id = randomUUID();
+    const newInvoice: Invoice = {
+      ...invoice,
+      id,
+      status: invoice.status || "draft",
+      currency: invoice.currency || "INR",
+      cgstAmount: invoice.cgstAmount ?? 0,
+      sgstAmount: invoice.sgstAmount ?? 0,
+      igstAmount: invoice.igstAmount ?? 0,
+      discountAmount: invoice.discountAmount ?? 0,
+      gstRate: invoice.gstRate ?? 18,
+      hsnCode: invoice.hsnCode ?? null,
+      sacCode: invoice.sacCode ?? null,
+      einvoiceIrn: invoice.einvoiceIrn ?? null,
+      einvoiceAckNo: invoice.einvoiceAckNo ?? null,
+      einvoiceQrCode: invoice.einvoiceQrCode ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.invoices.set(id, newInvoice);
+    return newInvoice;
+  }
+
+  async updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice | undefined> {
+    const invoice = this.invoices.get(id);
+    if (!invoice) return undefined;
+    
+    const updated: Invoice = { ...invoice, ...data, updatedAt: new Date() };
+    this.invoices.set(id, updated);
+    return updated;
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    return this.invoices.delete(id);
+  }
+
+  async getNextInvoiceNumber(): Promise<string> {
+    const currentYear = new Date().getFullYear();
+    const invoices = Array.from(this.invoices.values());
+    const yearInvoices = invoices.filter(inv => 
+      inv.invoiceNumber.startsWith(`INV-${currentYear}`)
+    );
+    
+    const nextNumber = yearInvoices.length + 1;
+    return `INV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+  }
+
+  // Invoice Line Items
+  async getInvoiceLineItems(invoiceId: string): Promise<InvoiceLineItem[]> {
+    return Array.from(this.invoiceLineItems.values()).filter(item => item.invoiceId === invoiceId);
+  }
+
+  async getInvoiceLineItem(id: string): Promise<InvoiceLineItem | undefined> {
+    return this.invoiceLineItems.get(id);
+  }
+
+  async createInvoiceLineItem(item: InsertInvoiceLineItem): Promise<InvoiceLineItem> {
+    const id = randomUUID();
+    const newItem: InvoiceLineItem = {
+      ...item,
+      id,
+      resourceId: item.resourceId ?? null,
+      usageStart: item.usageStart ?? null,
+      usageEnd: item.usageEnd ?? null,
+      createdAt: new Date(),
+    };
+    this.invoiceLineItems.set(id, newItem);
+    return newItem;
+  }
+
+  async deleteInvoiceLineItem(id: string): Promise<boolean> {
+    return this.invoiceLineItems.delete(id);
+  }
+
+  // Usage Records
+  async getUsageRecords(userId: string, filters?: { startDate?: Date; endDate?: Date; billed?: boolean }): Promise<UsageRecord[]> {
+    let records = Array.from(this.usageRecords.values()).filter(rec => rec.userId === userId);
+    
+    if (filters?.startDate) {
+      records = records.filter(rec => rec.periodStart >= filters.startDate!);
+    }
+    if (filters?.endDate) {
+      records = records.filter(rec => rec.periodEnd <= filters.endDate!);
+    }
+    if (filters?.billed !== undefined) {
+      records = records.filter(rec => rec.billed === filters.billed);
+    }
+    
+    return records.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
+  }
+
+  async getUsageRecord(id: string): Promise<UsageRecord | undefined> {
+    return this.usageRecords.get(id);
+  }
+
+  async getUnbilledUsageRecords(userId: string): Promise<UsageRecord[]> {
+    return Array.from(this.usageRecords.values()).filter(
+      rec => rec.userId === userId && !rec.billed
+    );
+  }
+
+  async createUsageRecord(record: InsertUsageRecord & { userId: string }): Promise<UsageRecord> {
+    const id = randomUUID();
+    const newRecord: UsageRecord = {
+      ...record,
+      id,
+      metadata: record.metadata ?? {},
+      invoiceId: record.invoiceId ?? null,
+      billed: record.billed ?? null,
+      recordedAt: record.recordedAt || new Date(),
+      createdAt: new Date(),
+    };
+    this.usageRecords.set(id, newRecord);
+    return newRecord;
+  }
+
+  async markUsageRecordsAsBilled(recordIds: string[], invoiceId: string): Promise<void> {
+    for (const recordId of recordIds) {
+      const record = this.usageRecords.get(recordId);
+      if (record) {
+        this.usageRecords.set(recordId, { ...record, billed: true, invoiceId });
+      }
+    }
+  }
+
+  // Payment Methods
+  async getPaymentMethods(userId: string): Promise<PaymentMethod[]> {
+    return Array.from(this.paymentMethods.values()).filter(method => method.userId === userId);
+  }
+
+  async getPaymentMethod(id: string): Promise<PaymentMethod | undefined> {
+    return this.paymentMethods.get(id);
+  }
+
+  async getDefaultPaymentMethod(userId: string): Promise<PaymentMethod | undefined> {
+    return Array.from(this.paymentMethods.values()).find(
+      method => method.userId === userId && method.isDefault
+    );
+  }
+
+  async createPaymentMethod(method: InsertPaymentMethod & { userId: string }): Promise<PaymentMethod> {
+    const id = randomUUID();
+    const newMethod: PaymentMethod = {
+      ...method,
+      id,
+      status: method.status || "active",
+      isDefault: method.isDefault ?? null,
+      gatewayMethodId: method.gatewayMethodId ?? null,
+      cardLast4: method.cardLast4 ?? null,
+      cardBrand: method.cardBrand ?? null,
+      cardExpMonth: method.cardExpMonth ?? null,
+      cardExpYear: method.cardExpYear ?? null,
+      upiId: method.upiId ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.paymentMethods.set(id, newMethod);
+    return newMethod;
+  }
+
+  async updatePaymentMethod(id: string, data: Partial<PaymentMethod>): Promise<PaymentMethod | undefined> {
+    const method = this.paymentMethods.get(id);
+    if (!method) return undefined;
+    
+    const updated: PaymentMethod = { ...method, ...data, updatedAt: new Date() };
+    this.paymentMethods.set(id, updated);
+    return updated;
+  }
+
+  async deletePaymentMethod(id: string): Promise<boolean> {
+    return this.paymentMethods.delete(id);
+  }
+
+  async setDefaultPaymentMethod(userId: string, methodId: string): Promise<void> {
+    // Unset all defaults for this user
+    const userMethods = Array.from(this.paymentMethods.values()).filter(m => m.userId === userId);
+    for (const method of userMethods) {
+      this.paymentMethods.set(method.id, { ...method, isDefault: false, updatedAt: new Date() });
+    }
+    
+    // Set the new default
+    const newDefault = this.paymentMethods.get(methodId);
+    if (newDefault) {
+      this.paymentMethods.set(methodId, { ...newDefault, isDefault: true, updatedAt: new Date() });
+    }
+  }
+
+  // Payment Transactions
+  async getPaymentTransactions(userId: string): Promise<PaymentTransaction[]> {
+    return Array.from(this.paymentTransactions.values())
+      .filter(txn => txn.userId === userId)
+      .sort((a, b) => {
+        const aTime = a.initiatedAt?.getTime() ?? 0;
+        const bTime = b.initiatedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      });
+  }
+
+  async getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined> {
+    return this.paymentTransactions.get(id);
+  }
+
+  async getPaymentTransactionByGatewayId(gatewayTransactionId: string): Promise<PaymentTransaction | undefined> {
+    return Array.from(this.paymentTransactions.values()).find(
+      txn => txn.gatewayTransactionId === gatewayTransactionId
+    );
+  }
+
+  async createPaymentTransaction(transaction: InsertPaymentTransaction): Promise<PaymentTransaction> {
+    const id = randomUUID();
+    const newTransaction: PaymentTransaction = {
+      ...transaction,
+      id,
+      currency: transaction.currency || "INR",
+      status: transaction.status || "pending",
+      paymentMethodId: transaction.paymentMethodId ?? null,
+      paymentMethod: transaction.paymentMethod ?? null,
+      gatewayTransactionId: transaction.gatewayTransactionId ?? null,
+      gatewayOrderId: transaction.gatewayOrderId ?? null,
+      completedAt: transaction.completedAt ?? null,
+      initiatedAt: transaction.initiatedAt || new Date(),
+      createdAt: new Date(),
+    };
+    this.paymentTransactions.set(id, newTransaction);
+    return newTransaction;
+  }
+
+  async updatePaymentTransaction(id: string, data: Partial<PaymentTransaction>): Promise<PaymentTransaction | undefined> {
+    const transaction = this.paymentTransactions.get(id);
+    if (!transaction) return undefined;
+    
+    const updated: PaymentTransaction = { ...transaction, ...data };
+    this.paymentTransactions.set(id, updated);
+    return updated;
+  }
+
+  // Tax Calculations
+  async getTaxCalculations(invoiceId: string): Promise<TaxCalculation[]> {
+    return Array.from(this.taxCalculations.values()).filter(calc => calc.invoiceId === invoiceId);
+  }
+
+  async getTaxCalculation(id: string): Promise<TaxCalculation | undefined> {
+    return this.taxCalculations.get(id);
+  }
+
+  async createTaxCalculation(calculation: InsertTaxCalculation): Promise<TaxCalculation> {
+    const id = randomUUID();
+    const newCalculation: TaxCalculation = {
+      ...calculation,
+      id,
+      cgstAmount: calculation.cgstAmount ?? null,
+      sgstAmount: calculation.sgstAmount ?? null,
+      igstAmount: calculation.igstAmount ?? null,
+      cgstRate: calculation.cgstRate ?? null,
+      sgstRate: calculation.sgstRate ?? null,
+      igstRate: calculation.igstRate ?? null,
+      gstRate: calculation.gstRate ?? 18,
+      hsnSacCode: calculation.hsnSacCode ?? null,
+      calculatedAt: new Date(),
+      createdAt: new Date(),
+    };
+    this.taxCalculations.set(id, newCalculation);
+    return newCalculation;
+  }
+
+  // HSN/SAC Codes
+  async getHsnCodes(): Promise<HsnCode[]> {
+    return Array.from(this.hsnCodes.values()).filter(code => code.isActive);
+  }
+
+  async getHsnCode(id: string): Promise<HsnCode | undefined> {
+    return this.hsnCodes.get(id);
+  }
+
+  async getHsnCodeByServiceType(serviceType: string): Promise<HsnCode | undefined> {
+    return Array.from(this.hsnCodes.values()).find(
+      code => code.serviceType === serviceType && code.isActive
+    );
+  }
+
+  async createHsnCode(code: InsertHsnCode): Promise<HsnCode> {
+    const id = randomUUID();
+    const newCode: HsnCode = {
+      ...code,
+      id,
+      isActive: code.isActive ?? true,
+      gstRate: code.gstRate ?? 18,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.hsnCodes.set(id, newCode);
+    return newCode;
+  }
+
+  async updateHsnCode(id: string, data: Partial<HsnCode>): Promise<HsnCode | undefined> {
+    const code = this.hsnCodes.get(id);
+    if (!code) return undefined;
+    
+    const updated: HsnCode = { 
+      ...code, 
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.hsnCodes.set(id, updated);
+    return updated;
+  }
+
+  async deleteHsnCode(id: string): Promise<boolean> {
+    return this.hsnCodes.delete(id);
+  }
 }
 
-export const storage = new MemStorage();
+import { DatabaseStorage } from "./db-storage";
+
+// Feature flag to switch between MemStorage and DatabaseStorage
+// Set USE_DATABASE=true in environment to enable PostgreSQL (default: false for backward compatibility)
+// For production deployment: USE_DATABASE=true in .env or Replit secrets
+const USE_DATABASE = process.env.USE_DATABASE === "true";
+
+// Create hybrid storage that uses DatabaseStorage for user management when enabled
+function createStorage(): IStorage {
+  const memStorage = new MemStorage();
+  
+  if (!USE_DATABASE) {
+    console.log(`[Storage] Using MemStorage (in-memory)`);
+    return memStorage;
+  }
+  
+  const dbStorage = new DatabaseStorage();
+  console.log(`[Storage] Using DatabaseStorage (PostgreSQL) for user management`);
+  
+  // Override MemStorage methods with DatabaseStorage methods for user management
+  return Object.assign(memStorage, dbStorage) as IStorage;
+}
+
+export const storage = createStorage();

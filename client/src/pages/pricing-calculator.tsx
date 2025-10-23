@@ -5,8 +5,19 @@ import { Calculator, Server, HardDrive, Network, AlertCircle, CheckCircle, Trend
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useResellerAccess } from "@/hooks/use-role-access";
 
 export default function PricingCalculator() {
+  const { hasAccess, isLoading } = useResellerAccess();
+
+  if (isLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>

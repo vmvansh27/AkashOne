@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { randomUUID } from "crypto";
 import session from "express-session";
+import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import {
   registerUser,
@@ -26,7 +27,10 @@ import {
   insertSslCertificateSchema,
   insertObjectStorageBucketSchema,
   insertDdosProtectionRuleSchema,
-  insertCdnDistributionSchema
+  insertCdnDistributionSchema,
+  insertBillingAddressSchema,
+  insertPaymentMethodSchema,
+  insertHsnCodeSchema
 } from "@shared/schema";
 
 declare module "express-session" {
@@ -58,16 +62,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //   ... route handler
   // });
 
-  // Register endpoint
+  // Bootstrap check - Is system initialized with super admin?
+  app.get("/api/auth/bootstrap-status", async (req, res) => {
+    try {
+      const hasSuperAdmin = await storage.hasSuperAdmin();
+      res.json({ 
+        needsBootstrap: !hasSuperAdmin,
+        hasSuperAdmin 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Register endpoint - ONLY for bootstrap (first super admin creation)
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { username, email, password, gstNumber } = req.body;
+      const { username, email, password, gstNumber, isBootstrap } = req.body;
 
       if (!username || !email || !password || !gstNumber) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      await registerUser(username, email, password, gstNumber);
+      // SECURITY: Only allow bootstrap registration
+      // Regular users cannot self-register - they must be created by admin/reseller
+      if (!isBootstrap) {
+        return res.status(403).json({ 
+          message: "Self-registration is disabled. Please contact your administrator." 
+        });
+      }
+
+      // Check if this is a bootstrap registration (first super admin)
+      const hasSuperAdmin = await storage.hasSuperAdmin();
+      if (hasSuperAdmin) {
+        return res.status(403).json({ 
+          message: "System already initialized. Super admin already exists." 
+        });
+      }
+      
+      // Create super admin (only works when no super admin exists)
+      await registerUser(username, email, password, gstNumber, "super_admin");
+      
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -164,6 +199,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all users (RBAC filtered)
+  app.get("/api/users", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get all users
+      let users = await storage.getUsers();
+
+      // Filter based on role
+      if (currentUser.accountType === "super_admin") {
+        // Super admins can see all users
+      } else if (currentUser.accountType === "reseller") {
+        // Resellers can only see users in their organization
+        users = users.filter(u => u.organizationId === currentUser.organizationId);
+      } else {
+        // Customers and team members cannot access this endpoint
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      // Remove sensitive fields
+      const safeUsers = users.map(({ password, twoFactorSecret, ...user }) => user);
+      res.json(safeUsers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Setup 2FA endpoint
   app.get("/api/auth/2fa/setup", async (req, res) => {
     try {
@@ -212,6 +281,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Change password endpoint
+  app.post("/api/auth/change-password", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters long" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password
+      const validPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password
+      await storage.updateUser(req.session.userId, { password: hashedPassword });
+
+      res.json({ success: true, message: "Password changed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Logout endpoint
   app.post("/api/auth/logout", async (req, res) => {
     req.session.destroy((err) => {
@@ -220,6 +329,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ success: true });
     });
+  });
+
+  // ===================================
+  // Reseller Management
+  // ===================================
+
+  // Get all resellers (Super Admin only)
+  app.get("/api/resellers", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.accountType !== "super_admin") {
+        return res.status(403).json({ message: "Only super admins can view resellers" });
+      }
+
+      const allUsers = await storage.getUsers();
+      const resellers = allUsers.filter(u => u.accountType === "reseller");
+
+      // Remove sensitive fields
+      const safeResellers = resellers.map(({ password, twoFactorSecret, ...reseller }) => reseller);
+      res.json(safeResellers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a new reseller (Super Admin only)
+  app.post("/api/resellers", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const currentUser = await storage.getUser(req.session.userId);
+      if (!currentUser || currentUser.accountType !== "super_admin") {
+        return res.status(403).json({ message: "Only super admins can create resellers" });
+      }
+
+      const { username, email, password, gstNumber, defaultDiscountPercentage } = req.body;
+
+      if (!username || !email || !password || !gstNumber) {
+        return res.status(400).json({ message: "Username, email, password, and GST number are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create reseller with unique organizationId
+      const organizationId = randomUUID();
+      const reseller = await storage.createUser({
+        username,
+        email,
+        password: hashedPassword,
+        gstNumber,
+        accountType: "reseller",
+      } as any);
+
+      // Update reseller with additional fields
+      await storage.updateUser(reseller.id, {
+        organizationId,
+        defaultDiscountPercentage: defaultDiscountPercentage || 0,
+        status: "active",
+      });
+
+      // Remove sensitive fields
+      const { password: _, twoFactorSecret, ...safeReseller } = reseller;
+      res.json(safeReseller);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   // Kubernetes Cluster endpoints
@@ -1220,20 +1408,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      // Check admin/reseller permission
-      const hasPermission = await storage.userHasPermission(req.session.userId, "iam.manage");
-      if (!hasPermission) {
-        return res.status(403).json({ message: "Insufficient permissions to manage service plans" });
+      // Only super admins can create service plans
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.accountType !== "super_admin") {
+        return res.status(403).json({ message: "Only super admins can create service plans" });
       }
 
       // Validate request with Zod
       const { insertServicePlanSchema } = await import("@shared/schema");
       const validatedData = insertServicePlanSchema.parse(req.body);
 
-      const user = await storage.getUser(req.session.userId);
       const plan = await storage.createServicePlan({
         ...validatedData,
-        organizationId: user?.organizationId || null,
+        organizationId: user.organizationId || null,
       });
 
       res.json(plan);
@@ -2869,6 +3056,406 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "CDN distribution deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== BILLING ROUTES =====
+  
+  // Billing Addresses
+  app.get("/api/billing-addresses", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const addresses = await storage.getBillingAddresses(req.session.userId);
+      res.json(addresses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/billing-addresses", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertBillingAddressSchema.parse(req.body);
+      const address = await storage.createBillingAddress({
+        ...validatedData,
+        userId: req.session.userId,
+      });
+      res.status(201).json(address);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/billing-addresses/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const address = await storage.getBillingAddress(req.params.id);
+      if (!address || address.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Billing address not found" });
+      }
+
+      const updated = await storage.updateBillingAddress(req.params.id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/billing-addresses/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const address = await storage.getBillingAddress(req.params.id);
+      if (!address || address.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Billing address not found" });
+      }
+
+      await storage.deleteBillingAddress(req.params.id);
+      res.json({ message: "Billing address deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/billing-addresses/:id/set-default", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const address = await storage.getBillingAddress(req.params.id);
+      if (!address || address.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Billing address not found" });
+      }
+
+      await storage.setDefaultBillingAddress(req.session.userId, req.params.id);
+      res.json({ message: "Default billing address updated" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Payment Methods
+  app.get("/api/payment-methods", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const methods = await storage.getPaymentMethods(req.session.userId);
+      res.json(methods);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/payment-methods", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const validatedData = insertPaymentMethodSchema.parse(req.body);
+      const method = await storage.createPaymentMethod({
+        ...validatedData,
+        userId: req.session.userId,
+      });
+      res.status(201).json(method);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/payment-methods/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const method = await storage.getPaymentMethod(req.params.id);
+      if (!method || method.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Payment method not found" });
+      }
+
+      await storage.deletePaymentMethod(req.params.id);
+      res.json({ message: "Payment method deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/payment-methods/:id/set-default", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const method = await storage.getPaymentMethod(req.params.id);
+      if (!method || method.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Payment method not found" });
+      }
+
+      await storage.setDefaultPaymentMethod(req.session.userId, req.params.id);
+      res.json({ message: "Default payment method updated" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Invoices
+  app.get("/api/invoices", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { status, startDate, endDate } = req.query;
+      const filters: any = {};
+      if (status) filters.status = status as string;
+      if (startDate) filters.startDate = new Date(startDate as string);
+      if (endDate) filters.endDate = new Date(endDate as string);
+
+      const invoices = await storage.getInvoices(req.session.userId, filters);
+      res.json(invoices);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/invoices/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice || invoice.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const lineItems = await storage.getInvoiceLineItems(invoice.id);
+      const taxCalculations = await storage.getTaxCalculations(invoice.id);
+
+      res.json({ invoice, lineItems, taxCalculations });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/invoices/generate", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { periodStart, periodEnd, dueDate } = req.body;
+
+      const InvoiceGenerator = (await import("./utils/invoice-generator")).InvoiceGenerator;
+      const generator = new InvoiceGenerator(storage);
+
+      const result = await generator.generateInvoice({
+        userId: req.session.userId,
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Usage Records
+  app.get("/api/usage-records", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { startDate, endDate, billed } = req.query;
+      const filters: any = {};
+      if (startDate) filters.startDate = new Date(startDate as string);
+      if (endDate) filters.endDate = new Date(endDate as string);
+      if (billed !== undefined) filters.billed = billed === 'true';
+
+      const records = await storage.getUsageRecords(req.session.userId, filters);
+      res.json(records);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/usage-summary", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { startDate, endDate } = req.query;
+      const UsageTracker = (await import("./utils/usage-tracker")).UsageTracker;
+      const tracker = new UsageTracker(storage);
+
+      const summary = await tracker.generateUsageSummary(
+        req.session.userId,
+        new Date(startDate as string),
+        new Date(endDate as string)
+      );
+
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Payment Transactions
+  app.get("/api/payment-transactions", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const transactions = await storage.getPaymentTransactions(req.session.userId);
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/payment-transactions/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const transaction = await storage.getPaymentTransaction(req.params.id);
+      if (!transaction || transaction.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      res.json(transaction);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // HSN/SAC Code Management (Admin Only)
+  app.get("/api/hsn-codes", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Only super admin and reseller can view HSN codes
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.accountType !== "super_admin" && user.accountType !== "reseller")) {
+        return res.status(403).json({ message: "Access denied. Admin privileges required." });
+      }
+
+      const codes = await storage.getHsnCodes();
+      res.json(codes);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/hsn-codes", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Only super admin and reseller can create HSN codes
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.accountType !== "super_admin" && user.accountType !== "reseller")) {
+        return res.status(403).json({ message: "Access denied. Admin privileges required." });
+      }
+
+      const validation = insertHsnCodeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request data", errors: validation.error.errors });
+      }
+
+      const newCode = await storage.createHsnCode(validation.data);
+      res.status(201).json(newCode);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/hsn-codes/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Only super admin and reseller can update HSN codes
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.accountType !== "super_admin" && user.accountType !== "reseller")) {
+        return res.status(403).json({ message: "Access denied. Admin privileges required." });
+      }
+
+      const code = await storage.getHsnCode(req.params.id);
+      if (!code) {
+        return res.status(404).json({ message: "HSN code not found" });
+      }
+
+      // Validate request body - only allow specific fields to be updated
+      const updateSchema = insertHsnCodeSchema.partial();
+      const validation = updateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request data", errors: validation.error.errors });
+      }
+
+      const updated = await storage.updateHsnCode(req.params.id, validation.data);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/hsn-codes/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Only super admin can delete HSN codes
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.accountType !== "super_admin") {
+        return res.status(403).json({ message: "Access denied. Super admin privileges required." });
+      }
+
+      const code = await storage.getHsnCode(req.params.id);
+      if (!code) {
+        return res.status(404).json({ message: "HSN code not found" });
+      }
+
+      await storage.deleteHsnCode(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
   });
 

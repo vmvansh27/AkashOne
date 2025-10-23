@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Users, Server, Network, Building2, ChevronRight, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useSuperAdminAccess } from "@/hooks/use-role-access";
 
 //todo: remove mock functionality
 interface TenantNode {
@@ -242,6 +243,16 @@ function TenantTreeNode({ node, level = 0 }: { node: TenantNode; level?: number 
 }
 
 export default function SuperAdmin() {
+  const { hasAccess, isLoading } = useSuperAdminAccess();
+
+  if (isLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null; // Will redirect automatically
+  }
+
   const totalStats = {
     resellers: 3,
     customers: 95,

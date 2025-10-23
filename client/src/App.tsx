@@ -51,6 +51,7 @@ import ImagesTemplates from "@/pages/images-templates";
 import ResourceTags from "@/pages/resource-tags";
 import ActivityLogs from "@/pages/activity-logs";
 import ServicePlans from "@/pages/service-plans";
+import HsnCodes from "@/pages/hsn-codes";
 import { useQuery } from "@tanstack/react-query";
 
 function Router() {
@@ -95,6 +96,7 @@ function Router() {
       <Route path="/all-vms" component={AllVMs} />
       <Route path="/all-kubernetes" component={AllKubernetes} />
       <Route path="/security" component={SecuritySettings} />
+      <Route path="/settings" component={SecuritySettings} />
       <Route path="/payment-gateways" component={PaymentGateways} />
       <Route path="/pricing-calculator" component={PricingCalculator} />
       <Route path="/load-balancer" component={LoadBalancer} />
@@ -115,6 +117,7 @@ function Router() {
       <Route path="/resource-tags" component={ResourceTags} />
       <Route path="/activity-logs" component={ActivityLogs} />
       <Route path="/service-plans" component={ServicePlans} />
+      <Route path="/hsn-codes" component={HsnCodes} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, UserPlus } from "lucide-react";
+import { useResellerAccess } from "@/hooks/use-role-access";
 import {
   Table,
   TableBody,
@@ -60,6 +61,16 @@ const mockCustomers = [
 ];
 
 export default function ResellerCustomers() {
+  const { hasAccess, isLoading } = useResellerAccess();
+
+  if (isLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useSuperAdminAccess } from "@/hooks/use-role-access";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,16 @@ const servicePlanFormSchema = insertServicePlanSchema.extend({
 type ServicePlanFormData = z.infer<typeof servicePlanFormSchema>;
 
 export default function ServicePlans() {
+  const { hasAccess, isLoading: isCheckingAccess } = useSuperAdminAccess();
+
+  if (isCheckingAccess) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);

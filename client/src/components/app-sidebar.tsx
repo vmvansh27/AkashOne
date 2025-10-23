@@ -1,4 +1,3 @@
-import { Server, Network, HardDrive, LayoutDashboard, Settings, BarChart3, Shield, Receipt, Store, Palette, UserCog, Crown, UserCheck, Boxes, Database, Cloud, Globe, CreditCard, Calculator, Zap, Cloudy, TrendingUp, Users, Tag, Percent, Lock, MapPin, Key, Image } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,468 +12,175 @@ import {
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import type { FeatureFlag } from "@shared/schema";
-
-interface MenuItem {
-  title: string;
-  url: string;
-  icon: any;
-  featureKey?: string; // Optional feature key for dynamic filtering
-}
-
-const menuItems: MenuItem[] = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Virtual Machines",
-    url: "/vms",
-    icon: Server,
-  },
-  {
-    title: "Networks",
-    url: "/networks",
-    icon: Network,
-  },
-  {
-    title: "Kubernetes",
-    url: "/kubernetes",
-    icon: Boxes,
-  },
-  {
-    title: "Database",
-    url: "/database",
-    icon: Database,
-    featureKey: "database",
-  },
-  {
-    title: "Object Storage",
-    url: "/object-storage",
-    icon: Cloud,
-    featureKey: "object_storage",
-  },
-  {
-    title: "DNS",
-    url: "/dns",
-    icon: Globe,
-    featureKey: "dns",
-  },
-  {
-    title: "Storage",
-    url: "/storage",
-    icon: HardDrive,
-  },
-  {
-    title: "Monitoring",
-    url: "/monitoring",
-    icon: BarChart3,
-  },
-];
-
-const billingItems: MenuItem[] = [
-  {
-    title: "Billing",
-    url: "/billing",
-    icon: Receipt,
-    featureKey: "billing",
-  },
-  {
-    title: "Discount Coupons",
-    url: "/billing/coupons",
-    icon: Tag,
-    featureKey: "billing",
-  },
-  {
-    title: "User Discounts",
-    url: "/billing/user-discounts",
-    icon: Percent,
-    featureKey: "billing",
-  },
-  {
-    title: "Payment Gateways",
-    url: "/payment-gateways",
-    icon: CreditCard,
-    featureKey: "payment_gateway",
-  },
-  {
-    title: "Pricing Calculator",
-    url: "/pricing-calculator",
-    icon: Calculator,
-    featureKey: "pricing_calculator",
-  },
-];
-
-const advancedComputeItems: MenuItem[] = [
-  {
-    title: "GPU Instances",
-    url: "/gpu-instances",
-    icon: Zap,
-    featureKey: "gpu_instances",
-  },
-  {
-    title: "Auto-Scaling Groups",
-    url: "/auto-scaling",
-    icon: TrendingUp,
-    featureKey: "vm_autoscaling",
-  },
-];
-
-const networkingItems: MenuItem[] = [
-  {
-    title: "Load Balancer",
-    url: "/load-balancer",
-    icon: Network,
-    featureKey: "load_balancer",
-  },
-  {
-    title: "SSL Certificates",
-    url: "/ssl-certificates",
-    icon: Shield,
-    featureKey: "ssl_certificates",
-  },
-  {
-    title: "CDN Service",
-    url: "/cdn",
-    icon: Cloudy,
-    featureKey: "cdn_service",
-  },
-];
-
-const adminItems: MenuItem[] = [
-  {
-    title: "Team Management",
-    url: "/team-management",
-    icon: Users,
-  },
-  {
-    title: "Role Management",
-    url: "/role-management",
-    icon: Shield,
-  },
-  {
-    title: "Activity Logs",
-    url: "/activity-logs",
-    icon: BarChart3,
-  },
-  {
-    title: "Service Plans",
-    url: "/service-plans",
-    icon: Server,
-  },
-  {
-    title: "Security",
-    url: "/security",
-    icon: Shield,
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
-];
-
-const resellerItems: MenuItem[] = [
-  {
-    title: "Resellers",
-    url: "/resellers",
-    icon: Store,
-  },
-  {
-    title: "White-Label",
-    url: "/whitelabel",
-    icon: Palette,
-  },
-  {
-    title: "My Customers",
-    url: "/customers",
-    icon: UserCog,
-  },
-];
-
-const superAdminItems: MenuItem[] = [
-  {
-    title: "Super Admin",
-    url: "/super-admin",
-    icon: Crown,
-  },
-  {
-    title: "Feature Management",
-    url: "/feature-management",
-    icon: Settings,
-  },
-  {
-    title: "Admin Rights",
-    url: "/admin-rights",
-    icon: UserCheck,
-  },
-  {
-    title: "All VMs",
-    url: "/all-vms",
-    icon: Server,
-  },
-  {
-    title: "All Kubernetes",
-    url: "/all-kubernetes",
-    icon: Boxes,
-  },
-];
-
-const cloudStackItems: MenuItem[] = [
-  {
-    title: "Block Storage",
-    url: "/block-storage",
-    icon: HardDrive,
-    featureKey: "volumes",
-  },
-  {
-    title: "Firewall Rules",
-    url: "/firewall",
-    icon: Shield,
-    featureKey: "firewall",
-  },
-  {
-    title: "Security Groups",
-    url: "/security-groups",
-    icon: Lock,
-    featureKey: "security_groups",
-  },
-  {
-    title: "VPC",
-    url: "/vpc",
-    icon: Network,
-    featureKey: "vpc",
-  },
-  {
-    title: "Elastic IP",
-    url: "/elastic-ip",
-    icon: MapPin,
-    featureKey: "elastic_ip",
-  },
-  {
-    title: "SSH Keys",
-    url: "/ssh-keys",
-    icon: Key,
-    featureKey: "ssh_keys",
-  },
-  {
-    title: "Images & Templates",
-    url: "/images-templates",
-    icon: Image,
-    featureKey: "images_templates",
-  },
-  {
-    title: "Resource Tags",
-    url: "/resource-tags",
-    icon: Tag,
-    featureKey: "resource_tags",
-  },
-];
+import type { FeatureFlag, User } from "@shared/schema";
+import { getMenuForRole, hasMenuAccess, type MenuSection, type MenuItem } from "@/lib/role-navigation";
+import { Badge } from "@/components/ui/badge";
+import { Building2, LogOut, User as UserIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const [location] = useLocation();
 
-  // Fetch feature flags
+  // Fetch current user
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  // Fetch user permissions (for team members)
+  const { data: userPermissions = [] } = useQuery<string[]>({
+    queryKey: ["/api/iam/me/permissions"],
+    enabled: user?.accountType === "team_member",
+  });
+
+  // Fetch enabled features
   const { data: features = [] } = useQuery<FeatureFlag[]>({
     queryKey: ["/api/feature-flags"],
   });
 
-  // Create a map of feature keys to enabled status
-  const featureMap = new Map<string, boolean>();
-  features.forEach((feature) => {
-    featureMap.set(feature.key, feature.enabled);
-  });
+  // Get role-based menu
+  const menuSections: MenuSection[] = user
+    ? getMenuForRole(user.accountType || "customer")
+    : [];
 
-  // Filter function for menu items based on feature flags
-  const filterByFeature = (items: MenuItem[]) => {
-    return items.filter((item) => {
-      // If no feature key, always show
-      if (!item.featureKey) return true;
-      // Show if feature is enabled (default to false if not found)
-      return featureMap.get(item.featureKey) === true;
-    });
+  // Filter features
+  const enabledFeatureKeys = new Set(
+    features.filter((f) => f.enabled).map((f) => f.key)
+  );
+
+  // Filter menu items based on permissions and features
+  const filterMenuItem = (item: MenuItem): boolean => {
+    // Check feature flag if specified
+    if (item.featureKey && !enabledFeatureKeys.has(item.featureKey)) {
+      return false;
+    }
+
+    // For team members, check permissions
+    if (user?.accountType === "team_member") {
+      return hasMenuAccess(item, userPermissions);
+    }
+
+    return true;
   };
 
-  const visibleMenuItems = filterByFeature(menuItems);
-  const visibleBillingItems = filterByFeature(billingItems);
-  const visibleAdvancedComputeItems = filterByFeature(advancedComputeItems);
-  const visibleNetworkingItems = filterByFeature(networkingItems);
-  const visibleCloudStackItems = filterByFeature(cloudStackItems);
+  const getRoleBadgeColor = (accountType: string) => {
+    switch (accountType) {
+      case "super_admin":
+        return "bg-purple-600 text-white hover:bg-purple-700";
+      case "reseller":
+        return "bg-blue-600 text-white hover:bg-blue-700";
+      case "customer":
+        return "bg-green-600 text-white hover:bg-green-700";
+      case "team_member":
+        return "bg-orange-600 text-white hover:bg-orange-700";
+      default:
+        return "bg-gray-600 text-white hover:bg-gray-700";
+    }
+  };
+
+  const getRoleLabel = (accountType: string) => {
+    switch (accountType) {
+      case "super_admin":
+        return "Super Admin";
+      case "reseller":
+        return "Reseller";
+      case "customer":
+        return "Customer";
+      case "team_member":
+        return "Team Member";
+      default:
+        return "User";
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <Server className="h-5 w-5 text-primary-foreground" />
+    <Sidebar data-testid="sidebar-main">
+      <SidebarHeader className="border-b p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+            <Building2 className="h-6 w-6 text-primary-foreground" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">AkashOne.com</span>
-            <span className="text-xs text-muted-foreground">Mieux Technologies</span>
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold">AkashOne</h2>
+            {user && (
+              <Badge
+                variant="secondary"
+                className={`mt-1 text-xs ${getRoleBadgeColor(user.accountType || "customer")}`}
+                data-testid="badge-user-role"
+              >
+                {getRoleLabel(user.accountType || "customer")}
+              </Badge>
+            )}
           </div>
         </div>
       </SidebarHeader>
+
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Resources</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visibleMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuSections.map((section, idx) => {
+          const filteredItems = section.items.filter(filterMenuItem);
 
-        {visibleAdvancedComputeItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Advanced Compute</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleAdvancedComputeItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={location === item.url}>
-                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+          // Don't render empty sections
+          if (filteredItems.length === 0) {
+            return null;
+          }
 
-        {visibleNetworkingItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Networking</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleNetworkingItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={location === item.url}>
-                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+          return (
+            <SidebarGroup key={idx}>
+              <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {filteredItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location === item.url;
 
-        {visibleCloudStackItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Infrastructure</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleCloudStackItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={location === item.url}>
-                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {visibleBillingItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Billing & Pricing</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleBillingItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={location === item.url}>
-                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Super Admin</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {superAdminItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Reseller Portal</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {resellerItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Administration</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/ /g, '-')}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                    return (
+                      <SidebarMenuItem key={item.url}>
+                        <SidebarMenuButton asChild isActive={isActive}>
+                          <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                            <Icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground">
-            <span className="text-sm font-medium">AD</span>
-          </div>
-          <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-sm font-medium truncate">Admin User</span>
-            <span className="text-xs text-muted-foreground truncate">admin@akashone.com</span>
-          </div>
+
+      <SidebarFooter className="border-t p-4">
+        <div className="space-y-2">
+          {user && (
+            <div className="flex items-center gap-2 rounded-lg bg-muted p-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary">
+                <UserIcon className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate" data-testid="text-username">
+                  {user.username}
+                </p>
+                <p className="text-xs text-muted-foreground truncate" data-testid="text-email">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={handleLogout}
+            data-testid="button-logout"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
         </div>
       </SidebarFooter>
     </Sidebar>

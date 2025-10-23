@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSuperAdminAccess } from "@/hooks/use-role-access";
 import {
   Table,
   TableBody,
@@ -48,6 +49,16 @@ const iconMap: Record<string, any> = {
 };
 
 export default function FeatureManagement() {
+  const { hasAccess, isLoading: isCheckingAccess } = useSuperAdminAccess();
+
+  if (isCheckingAccess) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const { toast } = useToast();
 
   // Fetch all feature flags

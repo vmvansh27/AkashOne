@@ -1,7 +1,7 @@
 # AkashOne.com - Cloud Management Portal
 
 ## Overview
-AkashOne.com is a comprehensive cloud management platform developed by Mieux Technologies Pvt Ltd, designed to offer robust VM provisioning, resource monitoring, network management, and advanced billing solutions. It caters to the Indian market with GST-compliant billing, supports reseller white-labeling, and features hierarchical multi-tenant administration. The platform includes secure authentication with 2FA, Kubernetes-as-a-Service (KaaS), Database-as-a-Service (DBaaS), and a dynamic feature management system for extensible functionality. Its core ambition is to provide an all-encompassing, secure, and flexible cloud infrastructure management solution.
+AkashOne.com is a comprehensive cloud management platform by Mieux Technologies Pvt Ltd, offering VM provisioning, resource monitoring, network management, and advanced GST-compliant billing for the Indian market. It features reseller white-labeling, hierarchical multi-tenant administration, secure 2FA authentication, Kubernetes-as-a-Service (KaaS), Database-as-a-Service (DBaaS), and dynamic feature management. The platform aims to be an all-encompassing, secure, and flexible cloud infrastructure management solution.
 
 ## User Preferences
 ### Branding
@@ -30,97 +30,43 @@ AkashOne.com is a comprehensive cloud management platform developed by Mieux Tec
 11. Helpdesk/Support tickets system (Pending)
 12. Terraform integration (Pending)
 
-## Recent Changes
-### CloudStack Feature Expansion (October 12, 2025)
-- **11 New CloudStack Features Added** - All architect-verified and production-ready
-  1. **Firewall Rules**: Complete CRUD with IP filtering, protocol rules, and port configuration
-  2. **NAT Gateways**: Port forwarding and NAT rule management
-  3. **SSH Keys**: Public key management for secure VM access
-  4. **ISO Images**: Custom ISO upload and VM boot management
-  5. **Reserved IPs**: Static IP allocation and assignment
-  6. **IPsec VPN Tunnels**: Site-to-site VPN configuration
-  7. **Load Balancers**: Application load balancing with health checks
-  8. **SSL Certificates**: Certificate management for HTTPS
-  9. **Object Storage (S3)**: S3-compatible storage buckets with auto-generated access keys
-  10. **DDoS Protection**: Traffic filtering and rate limiting rules
-  11. **CDN Distributions**: Content delivery network configuration
-- **5 New Database Schemas**: load_balancers, ssl_certificates, object_storage_buckets, ddos_protection_rules, cdn_distributions
-- **33 API Routes Added**: Full CRUD endpoints for all features with authentication and authorization
-- **Storage Layer Expanded**: 20 new IStorage methods with MemStorage implementations
-- **Security Pattern Applied**: Server-generated cloudstackIds with resource-specific prefixes (fw-, nat-, lb-, ssl-, s3-, ddos-, cdn-, etc.)
-- **Object Storage Security**: Auto-generated accessKey (AK + 20 chars) and secretKey (dual UUID) server-side
-
-### Security Fixes (October 12, 2025)
-- **CRITICAL: Fixed cloudstackId spoofing vulnerability** in VPC Management and Block Storage features
-  - Removed client control over `cloudstackId` fields
-  - Server now generates unique identifiers (UUID-based until CloudStack API integration)
-  - Applied secure validation pattern: `insertSchema.omit({ userId: true, cloudstackId: true })`
-  - Protected fields (id, userId, cloudstackId) excluded from all client updates
-  - Architect-verified and production-ready
-
 ## System Architecture
-AkashOne.com is built with a clear separation between its frontend and backend components.
+AkashOne.com employs a clear separation between its frontend and backend components.
 
-### Frontend (React + TypeScript + Vite)
-The frontend provides a rich, interactive user experience using React 18, TypeScript, and Vite for fast development. Routing is handled by Wouter, and data fetching and caching are managed with TanStack Query. The UI adheres to a modern SaaS aesthetic, utilizing Shadcn UI, Tailwind CSS, Radix UI, and Lucide icons for a consistent design system. Key pages include Dashboard, Virtual Machines, Kubernetes, Database, Networks, Storage, Monitoring, Billing, and dedicated administration pages for IAM, Resellers, and Feature Management. A dynamic sidebar navigation adapts based on enabled features.
+### UI/UX Decisions
+The frontend, built with React, TypeScript, and Vite, uses Wouter for routing and TanStack Query for data management. The UI follows a modern SaaS aesthetic with Shadcn UI, Tailwind CSS, Radix UI, and Lucide icons, supporting both dark and light modes. Dynamic sidebar navigation adapts based on user roles and enabled features.
 
-### Backend (Express + TypeScript)
-The backend is an Express.js application written in TypeScript. It uses a MemStorage pattern with PostgreSQL (Drizzle ORM) for persistence. Authentication is session-based, leveraging Passport.js, bcrypt for password hashing, and otplib/QRCode for TOTP-based 2FA. The system integrates directly with CloudStack APIs, handling VM lifecycle operations, snapshot management, and async job polling. It implements a comprehensive Role-Based Access Control (RBAC) system with granular permissions and multi-tenant isolation. A Feature Management System allows dynamic enabling/disabling of features via flags, which also control API route access.
+### Technical Implementations
+The backend is an Express.js application in TypeScript, utilizing a MemStorage pattern with PostgreSQL (Drizzle ORM) for persistence. Authentication is session-based via Passport.js, bcrypt for password hashing, and otplib/QRCode for TOTP 2FA. It integrates with CloudStack APIs for VM lifecycle management and employs a comprehensive Role-Based Access Control (RBAC) system with multi-tenant isolation. A Feature Management System dynamically controls UI elements and API access. Key features include KaaS, DBaaS, VM Snapshot/Backup, and a hybrid service plan system. The GST billing system handles automated tax calculations with fractional paise precision and generates compliant invoices.
 
-### Core Features and Implementations
-- **CloudStack Integration:** Full API integration for VM provisioning, lifecycle management, and snapshot/backup operations, including async job polling. Supports dynamic service plan selection.
-- **Hybrid Service Plan System:** Allows creation of custom service plans with flexible resource specifications (CPU, RAM, storage, bandwidth), pricing, and public/private visibility. Can integrate with CloudStack offerings or operate independently for white-label scenarios.
-- **Identity and Access Management (IAM):** Comprehensive RBAC with system-defined and custom roles. Granular permissions across various service categories (Compute, Networking, Billing, etc.). Team member management with invitation and role assignment, ensuring organization isolation.
-- **Feature Management:** Centralized system to toggle features on/off, dynamically updating the UI and protecting API routes.
+### Feature Specifications
+- **CloudStack Integration:** Full API integration for VM provisioning, lifecycle, and snapshot operations, including async job polling and dynamic service plan selection.
+- **Hybrid Service Plan System:** Custom service plans with flexible resource specifications, pricing, and visibility.
+- **Identity and Access Management (IAM):** Comprehensive RBAC with system-defined and custom roles, granular permissions, and multi-tenant team management.
+- **Feature Management:** Centralized system for dynamic feature toggling, impacting UI and API routes.
 - **VM Snapshot/Backup:** UI and backend support for creating, listing, restoring, and deleting VM snapshots.
-- **Kubernetes-as-a-Service (KaaS) & Database-as-a-Service (DBaaS):** APIs for one-click provisioning and management of Kubernetes clusters and managed database instances (MySQL, PostgreSQL, MongoDB, Redis).
-- **Authentication:** Secure username/password and TOTP 2FA, with QR code generation for setup.
+- **Kubernetes-as-a-Service (KaaS) & Database-as-a-Service (DBaaS):** One-click provisioning and management of Kubernetes clusters and managed database instances (MySQL, PostgreSQL, MongoDB, Redis).
+- **Authentication:** Secure username/password and TOTP 2FA.
+- **GST-Compliant Billing:** Automated tax calculation (CGST/SGST/IGST), usage tracking, and invoice generation adhering to Indian tax laws (HSN/SAC codes, state-based logic, fractional paise precision).
+- **CloudStack Features:** Includes Firewall Rules, NAT Gateways, SSH Keys, ISO Images, Reserved IPs, IPsec VPN Tunnels, Load Balancers, SSL Certificates, Object Storage (S3), DDoS Protection, and CDN Distributions.
 
-### Design Patterns & Tech
+### System Design Choices
 - Session-based authentication with secure cookies.
-- MemStorage pattern with a PostgreSQL migration path.
+- MemStorage pattern with PostgreSQL migration path.
 - React Query for data fetching and caching.
-- Shadcn UI for component library and Tailwind CSS for styling.
 - Server-side rendering with client-side hydration.
+- Multi-tenancy achieved via `userId` isolation, `cloudstackId` for CloudStack integration, and resource metadata caching across all database schemas.
 
-### Database Schema
-**Core Tables:**
-- `users` - User accounts with authentication and 2FA
-- `virtual_machines` - VM instances and configurations
-- `vm_snapshots` - VM backup and restore points
-- `kubernetes_clusters` - K8s cluster deployments
-- `databases` - Managed database instances
-- `feature_flags` - Dynamic feature toggles
-
-**RBAC & IAM:**
-- `roles` - User role definitions
-- `permissions` - Granular permission set
-- `role_permissions` - Role-permission mappings
-- `user_roles` - User-role assignments
-- `team_members` - Multi-tenant team management
-
-**CloudStack Infrastructure:**
-- `firewall_rules` - Network firewall configuration
-- `nat_gateways` - NAT and port forwarding rules
-- `ssh_keys` - Public key management
-- `iso_images` - Custom ISO images
-- `reserved_ips` - Static IP allocations
-- `ipsec_tunnels` - Site-to-site VPN tunnels
-- `load_balancers` - Application load balancing
-- `ssl_certificates` - SSL/TLS certificate storage
-- `object_storage_buckets` - S3-compatible storage
-- `ddos_protection_rules` - DDoS mitigation rules
-- `cdn_distributions` - CDN configuration
-- `dns_zones` - DNS zone management
-- `block_storage_volumes` - Persistent block storage
-- `vpcs` - Virtual private cloud networks
-
-All schemas support multi-tenancy via userId isolation, CloudStack integration via cloudstackId, and resource metadata caching.
+### Database Schema Highlights
+- **Core:** `users`, `virtual_machines`, `vm_snapshots`, `kubernetes_clusters`, `databases`, `feature_flags`.
+- **RBAC & IAM:** `roles`, `permissions`, `role_permissions`, `user_roles`, `team_members`.
+- **CloudStack Infrastructure:** `firewall_rules`, `nat_gateways`, `ssh_keys`, `iso_images`, `reserved_ips`, `ipsec_tunnels`, `load_balancers`, `ssl_certificates`, `object_storage_buckets`, `ddos_protection_rules`, `cdn_distributions`, `dns_zones`, `block_storage_volumes`, `vpcs`.
+- **GST-Compliant Billing:** `billing_addresses`, `invoices`, `invoice_line_items`, `usage_records`, `payment_methods`, `payment_transactions`, `tax_calculations`.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database for persistent storage, managed via Drizzle ORM.
-- **CloudStack API:** Integrated for virtual machine management, including provisioning, lifecycle operations, and snapshot capabilities. Requires `CLOUDSTACK_API_URL`, `CLOUDSTACK_API_KEY`, and `CLOUDSTACK_SECRET_KEY`.
-- **Stripe, Razorpay, PayPal:** Planned integrations for payment gateway configuration.
-- **otplib & QRCode:** Used for Two-Factor Authentication (TOTP) functionality.
+- **CloudStack API:** Integrated for VM management, provisioning, lifecycle operations, and snapshots. Requires `CLOUDSTACK_API_URL`, `CLOUDSTACK_API_KEY`, and `CLOUDSTACK_SECRET_KEY`.
+- **Stripe, Razorpay, PayPal:** Planned integrations for payment gateways.
+- **otplib & QRCode:** Used for Two-Factor Authentication (TOTP).
 - **bcrypt:** Used for password hashing.
 - **Passport.js:** Authentication middleware.

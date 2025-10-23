@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useResellerAccess } from "@/hooks/use-role-access";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,16 @@ import { Plus, Pencil, Trash2, Tag, Calendar, Users, TrendingUp } from "lucide-r
 import type { DiscountCoupon } from "@shared/schema";
 
 export default function DiscountCouponsPage() {
+  const { hasAccess, isLoading: isCheckingAccess } = useResellerAccess();
+
+  if (isCheckingAccess) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<DiscountCoupon | null>(null);
   const { toast } = useToast();
